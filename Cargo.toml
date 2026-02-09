@@ -1,0 +1,54 @@
+[package]
+edition = "2024"
+name = "pico2w-300yen-lcd"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Embassy core
+embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt"] }
+embassy-rp = { version = "0.9", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp235xa"] }
+embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-sync = { version = "0.7", features = ["defmt"] }
+embassy-futures = { version = "0.1" }
+
+# Logging
+defmt = "1"
+defmt-rtt = "1"
+
+# Cortex-M
+cortex-m = { version = "0.7", features = ["inline-asm"] }
+cortex-m-rt = "0.7"
+critical-section = "1.1"
+panic-probe = { version = "1", features = ["print-defmt"] }
+
+# PIO
+pio = "0.3"
+pio-proc = "0.3"
+
+# Fixed point (PIO clock divider)
+fixed = "1"
+fixed-macro = "1"
+
+# Static allocation
+static_cell = "2"
+
+# Graphics (Layer 6 で使用)
+embedded-graphics = "0.8"
+
+[profile.dev]
+debug = 2
+opt-level = 2
+
+[profile.release]
+debug = 2
+lto = "fat"
+opt-level = 2
+
+[[example]]
+name = "layer0_gpio_test"
+path = "examples/layer0_gpio_test.rs"
+
+[[example]]
+name = "layer1_pio_clock"
+path = "examples/layer1_pio_clock.rs"

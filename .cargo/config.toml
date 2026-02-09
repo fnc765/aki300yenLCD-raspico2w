@@ -1,0 +1,9 @@
+[target.thumbv8m.main-none-eabihf]
+runner = "picotool load -u -v -x -t elf"
+# runner = "probe-rs run --chip RP235x --protocol swd"
+
+[build]
+target = "thumbv8m.main-none-eabihf"
+
+[env]
+DEFMT_LOG = "debug"
