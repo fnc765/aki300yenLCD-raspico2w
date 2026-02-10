@@ -45,14 +45,18 @@ debug = 2
 lto = "fat"
 opt-level = 2
 
-[[example]]
+[[bin]]
 name = "layer0_gpio_test"
-path = "examples/layer0_gpio_test.rs"
+path = "src/bin/layer0_gpio_test.rs"
 
-[[example]]
+[[bin]]
 name = "layer1_pio_clock"
-path = "examples/layer1_pio_clock.rs"
+path = "src/bin/layer1_pio_clock.rs"
 
-[[example]]
+[[bin]]
 name = "layer2_hsync_vsync"
-path = "examples/layer2_hsync_vsync.rs"
+path = "src/bin/layer2_hsync_vsync.rs"
+
+[[bin]]
+name = "layer3_solid_color"
+path = "src/bin/layer3_solid_color.rs"

@@ -146,3 +146,100 @@ pub const PIXEL_OUT_PROGRAM: &str = r#"
 //     jmp y-- normal_line side 1  ; [27] 次のライン (Y=0 で wrap)
 // .wrap
 // ```
+
+// ============================================================
+// Layer 3: デュアルSM ピクセル出力 PIO プログラム
+// ============================================================
+//
+// ## アーキテクチャ
+//
+// SM0 (PIO0 SM0): ピクセル出力 + NCLK
+// SM1 (PIO0 SM1): HSYNC/VSYNC タイミング
+//
+// Layer 2 の単一 SM 方式 (28命令) から、デュアル SM に分離することで:
+// - SM0: 2命令のみ (autopull でピクセルデータを自動供給)
+// - SM1: 19命令 (sideset なし、タイミング専用)
+// - SM0 の OUT ピンで 18-bit RGB666 データを出力可能に
+//
+// ## SM0: ピクセル出力 + NCLK (2命令)
+//
+// - OUT pins: GP2-GP19 (18-bit RGB666)
+// - sideset 1 pin: GP20 (NCLK)
+// - autopull: threshold=18, direction=Right
+//
+// ```asm
+// .side_set 1
+// .wrap_target
+//     out pins, 18  side 0    ; ピクセル出力 + NCLK LOW (LCD サンプル)
+//     nop           side 1    ; NCLK HIGH
+// .wrap
+// ```
+//
+// ## SM1: HSYNC/VSYNC タイミング (19命令)
+//
+// - SET 2 pins: GP21 (HSYNC, bit0), GP22 (VSYNC, bit1)
+// - sideset なし
+// - clock divider: SM0 の 2倍 → 1 PIO cycle = 1 NCLK
+//
+// ```asm
+// .wrap_target
+// ; VSYNC active line (1 line)
+//     set pins, 0            ; HSYNC=0, VSYNC=0
+//     pull block
+//     mov x, osr
+// hsync_v0:
+//     jmp x-- hsync_v0       ; X+1 回ループ
+//
+//     set pins, 1            ; HSYNC=1, VSYNC=0
+//     pull block
+//     mov x, osr
+// rest_v0:
+//     jmp x-- rest_v0
+//
+// ; 通常ラインカウントロード
+//     pull block
+//     mov y, osr
+//
+// ; 通常ラインループ
+// normal_line:
+//     set pins, 2            ; HSYNC=0, VSYNC=1
+//     pull block
+//     mov x, osr
+// hsync_v1:
+//     jmp x-- hsync_v1
+//
+//     set pins, 3            ; HSYNC=1, VSYNC=1
+//     pull block
+//     mov x, osr
+// rest_v1:
+//     jmp x-- rest_v1
+//
+//     jmp y-- normal_line
+// .wrap
+// ```
+//
+// ## SM1 タイミング計算 (1命令 = 1 NCLK)
+//
+// HSYNC フェーズ: set(1) + pull(1) + mov(1) + loop(X+1) = X + 4 NCLK
+// 残りフェーズ:   set(1) + pull(1) + mov(1) + loop(X'+1) = X' + 4 NCLK
+// ライン末尾:     jmp y--(1) = 1 NCLK
+// 合計: X + X' + 9 = 512 → X + X' = 503
+//
+// HSYNC パルス 5 NCLK: X + 4 = 5 → X = 1  (FIFO value = 1)
+// 残り 507 NCLK:       X' + 4 + 1 = 507 → X' = 502  (FIFO value = 502)
+//
+// ## Clock Divider
+//
+// SM0: FixedU32::<U8>::from_bits(5580)  = 21.796875 (2 PIO cycles = 1 NCLK)
+// SM1: FixedU32::<U8>::from_bits(11160) = 43.59375  (1 PIO cycle  = 1 NCLK)
+//
+// ## ピクセルワードフォーマット (right shift, OUT_BASE=GP2)
+//
+// bit 0  → GP2  (B5, 青MSB)
+// bit 5  → GP7  (B0, 青LSB)
+// bit 6  → GP8  (G5, 緑MSB)
+// bit 11 → GP13 (G0, 緑LSB)
+// bit 12 → GP14 (R5, 赤MSB)
+// bit 17 → GP19 (R0, 赤LSB)
+//
+// pixel_word = (R << 12) | (G << 6) | B

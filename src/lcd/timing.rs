@@ -8,7 +8,9 @@ pub const H_ACTIVE: u32 = 400;
 /// LCD 垂直解像度
 pub const V_ACTIVE: u32 = 96;
 
-/// 水平バックポーチ (HSYNC → 表示開始)
+/// HSYNC 開始から表示開始までのクロック数
+/// **注意**: HSYNC パルス幅 (5 NCLK) を含む。
+/// 標準用語の "back porch" とは異なり、HSYNC パルス + 実際のバックポーチ = 107 NCLK。
 pub const H_BACK_PORCH: u32 = 107;
 
 /// 水平フロントポーチ (表示終了 → 次 HSYNC)
@@ -45,9 +47,15 @@ pub const SYS_CLOCK_HZ: u32 = 150_000_000;
 pub const PIO_CLK_DIV_INT: u16 = (SYS_CLOCK_HZ / (PIXEL_CLOCK_HZ * 2)) as u16; // 21
 
 /// PIO クロック分周比 (小数部, 0-255)
-/// 余り = 150_000_000 - 21 × 3_440_640 × 2 = 150_000_000 - 144_506_880 = 5_493_120
-/// frac = 5_493_120 × 256 / (3_440_640 × 2) ≈ 204
-pub const PIO_CLK_DIV_FRAC: u8 = 204;
+/// 余り = SYS_CLOCK - INT × PIXEL_CLOCK × 2
+/// frac = 余り × 256 / (PIXEL_CLOCK × 2) ≈ 204.35 → 四捨五入で 205
+pub const PIO_CLK_DIV_FRAC: u8 = {
+    let remainder = SYS_CLOCK_HZ - (PIO_CLK_DIV_INT as u32) * PIXEL_CLOCK_HZ * 2;
+    let frac_512 = remainder * 512 / (PIXEL_CLOCK_HZ * 2);
+    // 四捨五入: (remainder * 512 / (PIXEL_CLOCK * 2) + 1) / 2
+    let frac_rounded = (frac_512 + 1) / 2;
+    frac_rounded as u8
+};
 
 // ============================================================
 // Layer 2: HSYNC/VSYNC PIO タイミング生成用定数
@@ -89,3 +97,34 @@ pub const PIO_REST_COUNT: u32 = H_REST - 4; // 503
 
 /// PIO Y レジスタ: 通常ライン数 (jmp y-- で Y+1 回ループ)
 pub const PIO_NORMAL_LINES_COUNT: u32 = V_NORMAL_LINES - 1; // 110
+
+// ============================================================
+// Layer 3: デュアルSM 構成用定数
+// ============================================================
+// SM0: ピクセル出力 + NCLK (sideset), autopull
+// SM1: HSYNC/VSYNC タイミング (sideset なし, SET 2 pins)
+//
+// SM1 は sideset を使わないためオーバーヘッドが異なる:
+//   HSYNC フェーズ: set(1) + pull(1) + mov(1) + loop(X+1) = X + 4 NCLK
+//   残りフェーズ:   set(1) + pull(1) + mov(1) + loop(X'+1) = X' + 4 NCLK
+//   ライン末尾: jmp y--(1) = 1 NCLK
+//   合計: X + X' + 9 = 512
+
+/// SM1 HSYNC カウント (Layer3: overhead=4, HSYNC_PULSE=5, count=1)
+pub const SM1_HSYNC_COUNT: u32 = HSYNC_PULSE_WIDTH - 4; // 1
+
+/// SM1 残りカウント (Layer3: overhead=4, jmp=1, rest=507, count=502)
+pub const SM1_REST_COUNT: u32 = H_REST - 4 - 1; // 502
+
+/// SM1 VSYNC ライン用 REST カウント
+/// 遷移命令 (pull+mov=2 NCLK) が通常ライン末尾 (jmp=1 NCLK) より 1 NCLK 多いため -1
+pub const SM1_VSYNC_REST_COUNT: u32 = SM1_REST_COUNT - 1; // 501
+
+/// SM1 通常ラインカウント (Y = V_NORMAL_LINES - 1)
+pub const SM1_NORMAL_LINES_Y: u32 = V_NORMAL_LINES - 1; // 110
+
+/// SM1 クロック分周比 raw bits (SM0 の 2倍: 1 PIO cycle = 1 NCLK)
+pub const SM1_CLK_DIV_BITS: u32 = ((PIO_CLK_DIV_INT as u32) << 8 | PIO_CLK_DIV_FRAC as u32) * 2;
+
+/// 表示前ブランキングピクセル数 (= H_BACK_PORCH, HSYNCパルス含む)
+pub const H_BLANK_BEFORE_ACTIVE: u32 = H_BACK_PORCH; // 107

@@ -19,6 +19,7 @@ use embassy_rp::pio::program::pio_asm;
 use embassy_rp::bind_interrupts;
 use fixed::FixedU32;
 use fixed::types::extra::U8;
+use pico2w_300yen_lcd::lcd::timing::{PIO_CLK_DIV_FRAC, PIO_CLK_DIV_INT};
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
@@ -52,9 +53,11 @@ async fn main(_spawner: Spawner) {
     let mut cfg = Config::default();
     cfg.use_program(&common.load_program(&prg.program), &[&nclk_pin]);
 
-    // クロック分周: 21.796875
-    // 実際の NCLK = 150MHz / (21.796875 × 2) ≈ 3.44 MHz
-    cfg.clock_divider = FixedU32::<U8>::from_bits((21u32 << 8) | 204u32);
+    // クロック分周: PIO_CLK_DIV_INT + PIO_CLK_DIV_FRAC/256
+    // 実際の NCLK = 150MHz / (分周比 × 2) ≈ 3.44 MHz
+    cfg.clock_divider = FixedU32::<U8>::from_bits(
+        (PIO_CLK_DIV_INT as u32) << 8 | PIO_CLK_DIV_FRAC as u32,
+    );
 
     sm.set_config(&cfg);
     sm.set_enable(true);

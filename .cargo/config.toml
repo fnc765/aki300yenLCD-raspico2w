@@ -1,5 +1,6 @@
 [target.thumbv8m.main-none-eabihf]
-runner = "picotool load -u -v -x -t elf"
+runner = "C:\\Users\\choco\\Documents\\scriptPath\\picotool\\picotool.exe load -u -v -x -t elf"
+# runner = "elf2uf2-rs -s"
 # runner = "probe-rs run --chip RP235x --protocol swd"
 
 [build]
