@@ -48,3 +48,44 @@ pub const PIO_CLK_DIV_INT: u16 = (SYS_CLOCK_HZ / (PIXEL_CLOCK_HZ * 2)) as u16; /
 /// 余り = 150_000_000 - 21 × 3_440_640 × 2 = 150_000_000 - 144_506_880 = 5_493_120
 /// frac = 5_493_120 × 256 / (3_440_640 × 2) ≈ 204
 pub const PIO_CLK_DIV_FRAC: u8 = 204;
+
+// ============================================================
+// Layer 2: HSYNC/VSYNC PIO タイミング生成用定数
+// ============================================================
+
+/// HSYNC パルス幅 (NCLK cycles)
+pub const HSYNC_PULSE_WIDTH: u32 = 5;
+
+/// HSYNC 後の残りクロック (1 ライン - HSYNC パルス幅)
+pub const H_REST: u32 = H_TOTAL - HSYNC_PULSE_WIDTH; // 507
+
+/// VSYNC パルス幅 (ライン数)
+pub const VSYNC_PULSE_LINES: u32 = 1;
+
+/// 通常ライン数 (V_TOTAL - VSYNC_PULSE_LINES)
+pub const V_NORMAL_LINES: u32 = V_TOTAL - VSYNC_PULSE_LINES; // 111
+
+/// PIO ループカウント: HSYNC パルスフェーズ
+///
+/// PIO HSYNC フェーズの内訳:
+/// - overhead: set + pull + mov + nop = 4 PIO (2 NCLK)
+/// - ループ: nop + jmp = 2 PIO × (X+1) 回 = (X+1) NCLK
+/// - 合計: X + 3 NCLK
+///
+/// X = HSYNC_PULSE_WIDTH - 3 = 2
+pub const PIO_HSYNC_COUNT: u32 = HSYNC_PULSE_WIDTH - 3; // 2
+
+/// PIO ループカウント: 残りフェーズ
+///
+/// PIO 残りフェーズの内訳:
+/// - overhead: set + pull + mov + nop = 4 PIO (2 NCLK)
+/// - ループ: nop + jmp = 2 PIO × (X+1) 回 = (X+1) NCLK
+/// - 合計: X + 3 NCLK
+/// - ライン末尾: nop + jmp = 2 PIO (1 NCLK)
+///
+/// HSYNC(X_h+3) + REST(X_r+3) + LINE_END(1) = 512
+/// → X_r = H_REST - 4 = 503
+pub const PIO_REST_COUNT: u32 = H_REST - 4; // 503
+
+/// PIO Y レジスタ: 通常ライン数 (jmp y-- で Y+1 回ループ)
+pub const PIO_NORMAL_LINES_COUNT: u32 = V_NORMAL_LINES - 1; // 110

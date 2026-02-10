@@ -52,3 +52,7 @@ path = "examples/layer0_gpio_test.rs"
 [[example]]
 name = "layer1_pio_clock"
 path = "examples/layer1_pio_clock.rs"
+
+[[example]]
+name = "layer2_hsync_vsync"
+path = "examples/layer2_hsync_vsync.rs"

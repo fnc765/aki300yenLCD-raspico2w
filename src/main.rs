@@ -10,8 +10,8 @@ use embassy_executor::Spawner;
 use embassy_rp::gpio::{Level, Output};
 use {defmt_rtt as _, panic_probe as _};
 
-mod lcd;
-mod pins;
+// LCD ドライバモジュールはライブラリクレート (lib.rs) で定義
+// Layer 3 以降で使用: use pico2w_300yen_lcd::{lcd, pins};
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {

@@ -17,7 +17,8 @@ use embassy_rp::peripherals::PIO0;
 use embassy_rp::pio::{Config, InterruptHandler, Pio};
 use embassy_rp::pio::program::pio_asm;
 use embassy_rp::bind_interrupts;
-use fixed::traits::ToFixed;
+use fixed::FixedU32;
+use fixed::types::extra::U8;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
@@ -51,17 +52,17 @@ async fn main(_spawner: Spawner) {
     let mut cfg = Config::default();
     cfg.use_program(&common.load_program(&prg.program), &[&nclk_pin]);
 
-    // クロック分周: 150MHz / (3.44MHz × 2) ≈ 21.8
-    // 2 PIO サイクルで 1 NCLK 周期 (HIGH + LOW)
-    // 分周比 21.8 → 実際の NCLK = 150MHz / (21.8 × 2) ≈ 3.44 MHz
-    cfg.clock_divider = (21u32 << 8 | 204u32).to_fixed();
+    // クロック分周: 21.796875
+    // 実際の NCLK = 150MHz / (21.796875 × 2) ≈ 3.44 MHz
+    cfg.clock_divider = FixedU32::<U8>::from_bits((21u32 << 8) | 204u32);
 
     sm.set_config(&cfg);
     sm.set_enable(true);
 
-    let actual_freq = 150_000_000u32 / (21 * 2 + 1); // 概算
+    // 実際の分周比: 21 + 204/256 = 21.796875
+    // NCLK = 150_000_000 / (21.796875 × 2) ≈ 3,440,860 Hz
     info!("NCLK started on GP20");
-    info!("Target: 3.44 MHz, Approx: {} Hz", actual_freq);
+    info!("Target: ~3.44 MHz (div=21.796875)");
     info!("Measure with oscilloscope to verify frequency and duty cycle");
 
     loop {
