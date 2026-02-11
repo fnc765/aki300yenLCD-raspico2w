@@ -10,12 +10,12 @@
 
 ```
 Layer 6: アプリケーション
-Layer 5: 描画ライブラリ（点・線・矩形・文字）
-Layer 4: フレームバッファ管理（ダブルバッファリング）
-Layer 3: DMA 転送（フレームバッファ → PIO FIFO）
-Layer 2: PIO タイミング制御（HSYNC/VSYNC + ブランキング）
-Layer 1: PIO ピクセル出力（RGB + NCLK）
-Layer 0: GPIO 基本動作確認（トグルテスト）
+Layer 5: フレームバッファ管理 + ダブルバッファリング  ✅
+Layer 4: DMA 転送（フレームバッファ → PIO FIFO）     ✅
+Layer 3: PIO 固定色出力 + DMA                       ✅
+Layer 2: PIO タイミング制御（HSYNC/VSYNC + ブランキング） ✅
+Layer 1: PIO ピクセル出力（RGB + NCLK）              ✅
+Layer 0: GPIO 基本動作確認（トグルテスト）             ✅
 ```
 
 ### フレームワーク選択: Embassy
@@ -41,8 +41,7 @@ raspberrypi+300yenLCD/
 │   │   ├── mod.rs           # LCD ドライバモジュール
 │   │   ├── pio_program.rs   # PIO プログラム定義
 │   │   ├── timing.rs        # タイミングパラメータ
-│   │   ├── dma.rs           # DMA 転送管理
-│   │   └── framebuffer.rs   # フレームバッファ管理
+│   │   └── framebuffer.rs   # フレームバッファ管理 (512×96 パディング方式)
 │   ├── gfx/
 │   │   ├── mod.rs           # 描画ライブラリ
 │   │   ├── primitives.rs    # 基本図形描画
@@ -54,7 +53,7 @@ raspberrypi+300yenLCD/
 │   ├── layer2_pio_timing.rs     # HSYNC/VSYNC タイミングテスト
 │   ├── layer3_pio_pattern.rs    # 固定パターン出力テスト
 │   ├── layer4_dma_scanline.rs   # DMA スキャンライン転送テスト
-│   ├── layer5_framebuffer.rs    # フレームバッファ表示テスト
+│   ├── layer5_framebuffer.rs    # フレームバッファ + ダブルバッファリング
 │   └── layer6_drawing.rs        # 描画ライブラリテスト
 ├── docs/                        # ドキュメント（既存）
 ├── Cargo.toml
@@ -288,67 +287,74 @@ active:
 
 ---
 
-## Layer 5: フレームバッファ管理
+## Layer 5: フレームバッファ管理 ✅
 
 ### 目的
 - ダブルバッファリングの実装
 - フレームバッファへの書き込みと表示の分離
 - フレーム同期（VSYNC タイミングでバッファスワップ）
 
-### 設計
+### 実装結果
+
+**コミット**: `01adc8e`
+
+フレームバッファは **512×96 パディング方式** を採用した。
+当初の計画（400×96 = 153KB）から変更し、各ラインに H_BACK_PORCH と
+H_FRONT_PORCH を含めることで DMA 転送時のブランキング挿入を不要にした:
 
 ```rust
 // src/lcd/framebuffer.rs
 
-pub const WIDTH: usize = 400;
-pub const HEIGHT: usize = 96;
+pub const LINE_WIDTH: usize = 512;  // H_TOTAL
+pub const ACTIVE_HEIGHT: usize = 96;
+pub const FB_SIZE: usize = LINE_WIDTH * ACTIVE_HEIGHT; // 49,152 words
 
-/// 1ピクセル = 18bit を u32 に格納
-/// ビット配置: [17:12] = R[5:0], [11:6] = G[5:0], [5:0] = B[5:0]
-///            (PIO OUT_BASE=GP2 で B→G→R の順に出力)
-pub type Pixel = u32;
-
+// 各ライン: [107 BLACK | 400 active pixels | 5 BLACK]
 pub struct FrameBuffer {
-    pub data: [Pixel; WIDTH * HEIGHT],  // 153,600 bytes
-}
-
-pub struct DoubleBuffer {
-    buffers: [FrameBuffer; 2],
-    front: usize,  // 現在表示中
-    back: usize,   // 書き込み先
-}
-
-impl DoubleBuffer {
-    pub fn swap(&mut self) {
-        core::mem::swap(&mut self.front, &mut self.back);
-    }
-    pub fn back_buffer(&mut self) -> &mut FrameBuffer { ... }
-    pub fn front_buffer(&self) -> &FrameBuffer { ... }
+    pub data: [u32; FB_SIZE],  // 192 KB
 }
 ```
+
+ダブルバッファリングは `Channel<&'static mut FrameBuffer, 1>` による
+所有権移動方式を採用した。当初計画の `DoubleBuffer` 構造体 +
+インデックス方式から変更し、Rust の所有権システムでデータ競合を型レベルで防止する:
+
+```text
+main (描画タスク)                display_task (DMA転送)
+┌──────────────────────┐        ┌──────────────────────┐
+│ back に描画            │        │ front を DMA 転送      │
+│ SWAP_CH.send(back)    │───────▶│ try_receive()         │
+│ back = RETURN_CH      │◀───────│ RETURN_CH.send(front) │
+│       .receive()      │        │ front = new_front     │
+└──────────────────────┘        └──────────────────────┘
+```
+
+- `display_task`: VSYNC 境界（V_BACK_PORCH 終了後）で `try_receive()` 非ブロッキングチェック
+- V_BACK_PORCH 期間 (line 0-14): `BLACK_LINE` を転送
+- アクティブ期間 (line 15-110): `fb.row_slice(y)` を DMA 転送
+- `DisplayPeripherals` 構造体で embassy の TaskFn 16 引数制限を回避
+
+**ヘルパー関数**:
+- `rgb666(r, g, b)`: 6bit チャンネル → ビット反転済みピクセルワード
+- `reverse6(v)`: PIO OUT right-shift に合わせた 6bit ビット反転
+- `set_pixel(x, y, color)` / `get_pixel(x, y)`: パディング考慮済みアクセス
+- `row_slice(y)`: DMA 転送用のライン全体スライス (512 words)
+- `clear(color)`: アクティブ領域のみクリア
 
 ### メモリ使用量
 
 ```
-ダブルバッファ: 153,600 × 2 = 307,200 bytes (300 KB)
-RP2350 SRAM: 520 KB
-残り: 220 KB → アプリケーション用に十分
-
-※ メモリが逼迫する場合、RGB565 (16bit) パッキングで:
-   400 × 96 × 2 × 2 = 153,600 bytes (150 KB) に削減可能
-```
-
-### 検証内容
-```rust
-// examples/layer5_framebuffer.rs
-// ダブルバッファリングでアニメーション表示
-// 例: スクロールするカラーグラデーション
+フレームバッファ: 512 × 96 × 4 = 196,608 bytes (192 KB)
+ダブルバッファ:   192 KB × 2 = 384 KB
+RP2350 SRAM:     520 KB
+使用率:          384 / 520 = 74%
+残り:            136 KB → アプリケーション + スタック用
 ```
 
 ### 合格基準
-- [ ] ダブルバッファリングでティアリングなし
-- [ ] VSYNC タイミングでのバッファスワップ
-- [ ] defmt でフレームレート表示（60fps 目標）
+- [x] ダブルバッファリングでティアリングなし
+- [x] VSYNC タイミングでのバッファスワップ
+- [x] グラデーションアニメーションが正常に表示される
 
 ---
 

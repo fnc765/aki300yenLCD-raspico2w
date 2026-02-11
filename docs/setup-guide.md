@@ -100,6 +100,7 @@ cargo run --bin <ターゲット名> --release
 | `layer2_hsync_vsync` | HSYNC/VSYNC タイミング生成 |
 | `layer3_solid_color` | LCD 固定色表示 |
 | `layer4_dma_colorbar` | DMA カラーバー表示テスト |
+| `layer5_framebuffer` | フレームバッファ + ダブルバッファリング |
 
 実行例:
 
