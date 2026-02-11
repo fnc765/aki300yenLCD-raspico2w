@@ -14,7 +14,7 @@
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::peripherals::PIO0;
-use embassy_rp::pio::{Config, InterruptHandler, Pio};
+use embassy_rp::pio::{Config, Direction, InterruptHandler, Pio};
 use embassy_rp::pio::program::pio_asm;
 use embassy_rp::bind_interrupts;
 use fixed::FixedU32;
@@ -49,6 +49,9 @@ async fn main(_spawner: Spawner) {
 
     // NCLK ピン (GP20) を PIO に割り当て
     let nclk_pin = common.make_pio_pin(p.PIN_20);
+
+    // ピン方向を出力に設定 (デフォルトは入力)
+    sm.set_pin_dirs(Direction::Out, &[&nclk_pin]);
 
     let mut cfg = Config::default();
     cfg.use_program(&common.load_program(&prg.program), &[&nclk_pin]);
