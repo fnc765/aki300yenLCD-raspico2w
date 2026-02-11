@@ -1,15 +1,14 @@
-//! Layer 3: 固定パターン出力テスト
+//! Layer 4: DMA スキャンライン転送 カラーバーテスト
 //!
-//! デュアルSM構成でLCDに固定色を表示する。
-//! SM0: ピクセル出力 + NCLK (autopull)
-//! SM1: HSYNC/VSYNC タイミング
+//! DMA を使って SM0 (ピクセルデータ) を転送し、
+//! SM1 (HSYNC/VSYNC) は CPU push で駆動するハイブリッド方式。
+//! カラーバーテストパターンを表示する。
 //!
 //! # 合格基準
-//! - [ ] LCD 画面に単色が表示される
-//! - [ ] 表示色が期待通り（白/赤/緑/青の切替確認）
-//! - [ ] 表示が安定している（ちらつきなし）
-//! - [ ] HSYNC/VSYNC/NCLK のタイミングが正しい
-//! - [ ] ブランキング期間にピクセルデータが表示されない
+//! - [ ] LCD 画面にカラーバー (8色帯) が表示される
+//! - [ ] DMA 転送中に CPU が空いている (defmt ログ出力で確認)
+//! - [ ] NCLK 停止リスクが実質的に解消されている
+//! - [ ] 長時間 (10分以上) 安定動作する
 
 #![no_std]
 #![no_main]
@@ -17,7 +16,9 @@
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::peripherals::PIO0;
-use embassy_rp::pio::{Config, Direction, FifoJoin, InterruptHandler, Pio, ShiftConfig, ShiftDirection};
+use embassy_rp::pio::{
+    Config, Direction, FifoJoin, InterruptHandler, Pio, ShiftConfig, ShiftDirection,
+};
 use embassy_rp::pio::program::pio_asm;
 use embassy_rp::bind_interrupts;
 use fixed::FixedU32;
@@ -31,49 +32,67 @@ bind_interrupts!(struct Irqs {
 
 /// 6ビット値のビット順を反転 (MSB↔LSB)
 /// PIO OUT pins の bit 順が LCD ピン配列と逆順のため必要
-//
-// PIO OUT pins (right shift) のビットマッピング:
-// bit 0 → GP2 (B5=青MSB) ← OUT shift の最下位ビットが GPIO の最低番号に接続
-// bit 5 → GP7 (B0=青LSB)
-// → ソフトウェアの bit 0 が LCD の MSB に対応するため、チャンネル内ビット反転が必要
 const fn reverse6(v: u32) -> u32 {
-    let v = v & 0x3F; // 6ビットにマスク
+    let v = v & 0x3F;
     ((v & 0x20) >> 5)
-    | ((v & 0x10) >> 3)
-    | ((v & 0x08) >> 1)
-    | ((v & 0x04) << 1)
-    | ((v & 0x02) << 3)
-    | ((v & 0x01) << 5)
+        | ((v & 0x10) >> 3)
+        | ((v & 0x08) >> 1)
+        | ((v & 0x04) << 1)
+        | ((v & 0x02) << 3)
+        | ((v & 0x01) << 5)
 }
 
 /// RGB666 ピクセルワード生成 (ビット順反転込み)
-///
-/// `pixel_word = (reverse6(R) << 12) | (reverse6(G) << 6) | reverse6(B)`
-/// OUT base=GP2, right shift で bit0→GP2
 const fn rgb666(r: u32, g: u32, b: u32) -> u32 {
     (reverse6(r) << 12) | (reverse6(g) << 6) | reverse6(b)
 }
 
-const WHITE: u32 = rgb666(63, 63, 63); // 0x3FFFF
-const RED: u32 = rgb666(63, 0, 0);     // 0x3F000
-const GREEN: u32 = rgb666(0, 63, 0);   // 0x00FC0
-const BLUE: u32 = rgb666(0, 0, 63);    // 0x0003F
+const WHITE: u32 = rgb666(63, 63, 63);
+const YELLOW: u32 = rgb666(63, 63, 0);
+const CYAN: u32 = rgb666(0, 63, 63);
+const GREEN: u32 = rgb666(0, 63, 0);
+const MAGENTA: u32 = rgb666(63, 0, 63);
+const RED: u32 = rgb666(63, 0, 0);
+const BLUE: u32 = rgb666(0, 0, 63);
 const BLACK: u32 = 0;
 
+/// カラーバーの色テーブル (8バンド)
+const COLORBAR_COLORS: [u32; 8] = [WHITE, YELLOW, CYAN, GREEN, MAGENTA, RED, BLUE, BLACK];
+
 /// SM0 TX FIFO エントリ数 (FifoJoin::TxOnly 使用時)
-const SM0_FIFO_DEPTH: u32 = 8;
+const SM0_FIFO_DEPTH: usize = 8;
+
+/// カラーバー1バンドあたりのピクセル数
+const BAND_WIDTH: usize = H_ACTIVE as usize / 8; // 400 / 8 = 50, 端数なし
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
-    info!("Layer 3: Solid color output test");
+    info!("Layer 4: DMA colorbar output test");
+
+    // === DMA バッファ構築 ===
+    // VSYNC ライン: プレフィル分を除いた残りを DMA で供給
+    let vsync_remaining = [BLACK; H_TOTAL as usize - SM0_FIFO_DEPTH]; // 512 - 8 = 504 words
+
+    // カラーバーライン: 107 BLACK + 400 カラー + 5 BLACK
+    let mut colorbar_line = [BLACK; H_TOTAL as usize]; // 512 words
+    {
+        let active_start = H_BLANK_BEFORE_ACTIVE as usize; // 107
+        for (band_idx, &color) in COLORBAR_COLORS.iter().enumerate() {
+            let start = active_start + band_idx * BAND_WIDTH;
+            for px in 0..BAND_WIDTH {
+                colorbar_line[start + px] = color;
+            }
+        }
+        // H_FRONT_PORCH (末尾5ピクセル) は初期値 BLACK のまま
+    }
 
     // === SM0: ピクセル出力 + NCLK (2命令) ===
     let prg_pixel = pio_asm!(
         ".side_set 1",
         ".wrap_target",
-        "    out pins, 18  side 0", // ピクセル出力 + NCLK LOW (LCD サンプル)
-        "    nop           side 1", // NCLK HIGH
+        "    out pins, 18  side 0",
+        "    nop           side 1",
         ".wrap",
     );
 
@@ -122,6 +141,9 @@ async fn main(_spawner: Spawner) {
         ..
     } = Pio::new(p.PIO0, Irqs);
 
+    // DMA チャネル
+    let mut dma_ch0 = p.DMA_CH0;
+
     // --- ピン設定 ---
     // RGB ピン (GP2-GP19): SM0 OUT
     let pin2 = common.make_pio_pin(p.PIN_2);
@@ -162,112 +184,85 @@ async fn main(_spawner: Spawner) {
     // --- SM0 設定 ---
     let loaded_pixel = common.load_program(&prg_pixel.program);
     let mut cfg0 = Config::default();
-    cfg0.use_program(&loaded_pixel, &[&nclk_pin]); // sideset = NCLK
+    cfg0.use_program(&loaded_pixel, &[&nclk_pin]);
     cfg0.set_out_pins(&[
         &pin2, &pin3, &pin4, &pin5, &pin6, &pin7,
         &pin8, &pin9, &pin10, &pin11, &pin12, &pin13,
         &pin14, &pin15, &pin16, &pin17, &pin18, &pin19,
     ]);
     cfg0.shift_out = ShiftConfig {
-        auto_fill: true,        // autopull 有効
-        threshold: 18,          // 18ビットで autopull
+        auto_fill: true,
+        threshold: 18,
         direction: ShiftDirection::Right,
     };
-    // SM0 clock: 2 PIO cycles = 1 NCLK
     cfg0.clock_divider = FixedU32::<U8>::from_bits(
         (PIO_CLK_DIV_INT as u32) << 8 | PIO_CLK_DIV_FRAC as u32,
     );
-    cfg0.fifo_join = FifoJoin::TxOnly;  // TX FIFO を 8 エントリに
+    cfg0.fifo_join = FifoJoin::TxOnly;
 
     // --- SM1 設定 ---
     let loaded_timing = common.load_program(&prg_timing.program);
     let mut cfg1 = Config::default();
-    cfg1.use_program(&loaded_timing, &[]); // sideset なし
+    cfg1.use_program(&loaded_timing, &[]);
     cfg1.set_set_pins(&[&hsync_pin, &vsync_pin]);
-    // SM1 clock: SM0 の 2倍 → 1 PIO cycle = 1 NCLK
     cfg1.clock_divider = FixedU32::<U8>::from_bits(SM1_CLK_DIV_BITS);
-    cfg1.fifo_join = FifoJoin::TxOnly;  // TX FIFO を 8 エントリに
+    cfg1.fifo_join = FifoJoin::TxOnly;
 
     sm0.set_config(&cfg0);
     sm1.set_config(&cfg1);
 
     // --- FIFO 事前充填 ---
-    // SM1: VSYNC ライン開始データ + 通常ライン1行目
     sm1.tx().push(SM1_HSYNC_COUNT);
     sm1.tx().push(SM1_VSYNC_REST_COUNT);
     sm1.tx().push(SM1_NORMAL_LINES_Y);
     sm1.tx().push(SM1_HSYNC_COUNT);
     sm1.tx().push(SM1_REST_COUNT);
 
-    // SM0: VSYNC ライン先頭のプレフィル (SM0_FIFO_DEPTH エントリ分)
     for _ in 0..SM0_FIFO_DEPTH {
         sm0.tx().push(BLACK);
     }
 
-    info!("Starting PIO with solid WHITE");
+    info!("Starting PIO with DMA colorbar");
     info!(
         "SM1 counts: HSYNC={}, REST={}, LINES_Y={}",
         SM1_HSYNC_COUNT, SM1_REST_COUNT, SM1_NORMAL_LINES_Y
     );
     info!(
-        "SM0 clkdiv bits={}, SM1 clkdiv bits={}",
-        (PIO_CLK_DIV_INT as u32) << 8 | PIO_CLK_DIV_FRAC as u32,
-        SM1_CLK_DIV_BITS
+        "DMA buffer sizes: vsync_remaining={} words, colorbar_line={} words",
+        vsync_remaining.len(),
+        colorbar_line.len()
     );
 
-    // 両 SM を同時に開始 (PioBatch でアトミックに enable)
+    // 両 SM を同時に開始
     common.apply_sm_batch(|batch| {
         batch.set_enable(&mut sm0, true);
         batch.set_enable(&mut sm1, true);
     });
 
-    // 表示色を順次切り替え
-    let colors = [WHITE, RED, GREEN, BLUE];
-    let color_names = ["WHITE", "RED", "GREEN", "BLUE"];
-    let mut color_idx = 0;
+    // === メインフレームループ ===
     let mut frame_count: u32 = 0;
-
     loop {
-        let color = colors[color_idx];
+        // VSYNC ライン: DMA で 504 黒ピクセルを転送 (プレフィル 8 ワード分は除外)
+        sm0.tx().dma_push(dma_ch0.reborrow(), &vsync_remaining, false).await;
 
-        // === 1フレーム生成 ===
-
-        // VSYNC ライン (512 - プレフィル8 = 504 ピクセル)
-        for _ in 0..(H_TOTAL - SM0_FIFO_DEPTH) {
-            sm0.tx().wait_push(BLACK).await;
-        }
-
-        // SM1 は VSYNC ラインを消化中。余裕時間を活用してログ出力
-        frame_count = frame_count.wrapping_add(1);
-        if frame_count % (TARGET_FPS * 3) == 0 {
-            color_idx = (color_idx + 1) % colors.len();
-            info!("Color: {} (frame {})", color_names[color_idx], frame_count);
-        }
-
-        // 通常ライン (V_NORMAL_LINES = 111 ライン)
+        // 通常ライン (111 lines)
         for _ in 0..V_NORMAL_LINES {
-            // SM1 タイミングデータ
+            // SM1 タイミングデータ (CPU push)
             sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
             sm1.tx().wait_push(SM1_REST_COUNT).await;
 
-            // SM0 ピクセルデータ
-            // ブランキング (H_BACK_PORCH = 107 NCLK, HSYNC パルス含む)
-            for _ in 0..H_BLANK_BEFORE_ACTIVE {
-                sm0.tx().wait_push(BLACK).await;
-            }
-            // アクティブ (H_ACTIVE = 400 NCLK)
-            for _ in 0..H_ACTIVE {
-                sm0.tx().wait_push(color).await;
-            }
-            // フロントポーチ (H_FRONT_PORCH = 5 NCLK)
-            for _ in 0..H_FRONT_PORCH {
-                sm0.tx().wait_push(BLACK).await;
-            }
+            // SM0 ピクセルデータ (DMA 転送)
+            sm0.tx().dma_push(dma_ch0.reborrow(), &colorbar_line, false).await;
         }
 
-        // 次フレームの SM1 VSYNC データ
+        // 次フレームの VSYNC タイミング
         sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
         sm1.tx().wait_push(SM1_VSYNC_REST_COUNT).await;
         sm1.tx().wait_push(SM1_NORMAL_LINES_Y).await;
+
+        frame_count = frame_count.wrapping_add(1);
+        if frame_count % (TARGET_FPS * 3) == 0 {
+            info!("DMA colorbar running (frame {})", frame_count);
+        }
     }
 }

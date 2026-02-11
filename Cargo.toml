@@ -60,3 +60,7 @@ path = "src/bin/layer2_hsync_vsync.rs"
 [[bin]]
 name = "layer3_solid_color"
 path = "src/bin/layer3_solid_color.rs"
+
+[[bin]]
+name = "layer4_dma_colorbar"
+path = "src/bin/layer4_dma_colorbar.rs"
