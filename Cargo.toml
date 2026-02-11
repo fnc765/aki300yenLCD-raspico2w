@@ -68,3 +68,7 @@ path = "src/bin/layer4_dma_colorbar.rs"
 [[bin]]
 name = "layer5_framebuffer"
 path = "src/bin/layer5_framebuffer.rs"
+
+[[bin]]
+name = "layer6_drawtest"
+path = "src/bin/layer6_drawtest.rs"
