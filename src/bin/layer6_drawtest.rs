@@ -24,7 +24,8 @@ use embassy_rp::Peri;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
 use embedded_graphics::geometry::Size;
-use embedded_graphics::mono_font::{ascii::FONT_6X10, MonoTextStyle};
+use embedded_graphics::mono_font::ascii::FONT_6X10;
+use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb666;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{Circle, Line, PrimitiveStyle, Rectangle};
@@ -119,11 +120,12 @@ async fn display_task(
     let mut dma_ch0 = res.dma_ch0;
 
     // === SM0: ピクセル出力 + NCLK (sideset) ===
+    // 2命令反転版: side 1 でデータセットアップ、side 0 の立ち下がりでLCDサンプル
     let prg_pixel = pio_asm!(
         ".side_set 1",
         ".wrap_target",
-        "    out pins, 18  side 0",
-        "    nop           side 1",
+        "    out pins, 18  side 1",   // データ出力 + NCLK HIGH（セットアップ期間）
+        "    nop           side 0",   // NCLK LOW（立ち下がりでLCDサンプル）
         ".wrap",
     );
 
@@ -355,12 +357,12 @@ async fn main(spawner: Spawner) {
     let mut back: &'static mut FrameBuffer = fb_b;
     let mut frame: u32 = 0;
 
+    let text_style = MonoTextStyle::new(&FONT_6X10, Rgb666::WHITE);
+
     loop {
-        // クリア
         DrawTarget::clear(back, Rgb666::BLACK).unwrap();
 
-        // テキスト
-        let text_style = MonoTextStyle::new(&FONT_6X10, Rgb666::WHITE);
+        // テキスト描画
         Text::new(
             "Hello, 300yen LCD!",
             embedded_graphics::geometry::Point::new(10, 12),
@@ -410,13 +412,13 @@ async fn main(spawner: Spawner) {
         .draw(back)
         .unwrap();
 
-        // 下部: カラーバー (8色, 各50px幅)
+        // カラーバー
         let colors = [
             Rgb666::WHITE,
-            Rgb666::new(63, 63, 0),  // Yellow
-            Rgb666::new(0, 63, 63),  // Cyan
+            Rgb666::new(63, 63, 0),
+            Rgb666::new(0, 63, 63),
             Rgb666::GREEN,
-            Rgb666::new(63, 0, 63),  // Magenta
+            Rgb666::new(63, 0, 63),
             Rgb666::RED,
             Rgb666::BLUE,
             Rgb666::BLACK,
@@ -432,7 +434,6 @@ async fn main(spawner: Spawner) {
             .unwrap();
         }
 
-        // swap
         SWAP_CH.send(back).await;
         back = RETURN_CH.receive().await;
 
