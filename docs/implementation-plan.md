@@ -9,7 +9,7 @@
 **ハードウェアが手元に届いた時点で Layer 0 から順に動作確認**できるようにする。
 
 ```
-Layer 6: アプリケーション
+Layer 6: アプリケーション（embedded-graphics DrawTarget）✅
 Layer 5: フレームバッファ管理 + ダブルバッファリング  ✅
 Layer 4: DMA 転送（フレームバッファ → PIO FIFO）     ✅
 Layer 3: PIO 固定色出力 + DMA                       ✅
@@ -17,6 +17,8 @@ Layer 2: PIO タイミング制御（HSYNC/VSYNC + ブランキング） ✅
 Layer 1: PIO ピクセル出力（RGB + NCLK）              ✅
 Layer 0: GPIO 基本動作確認（トグルテスト）             ✅
 ```
+
+> **全 Layer (0–6) 完了** — LCD ドライバスタック全層の実装・検証が完了しました。
 
 ### フレームワーク選択: Embassy
 
@@ -358,42 +360,66 @@ RP2350 SRAM:     520 KB
 
 ---
 
-## Layer 6: 描画ライブラリ
+## Layer 6: 描画ライブラリ ✅
 
 ### 目的
-- embedded-graphics クレートの統合 or 独自描画ライブラリ
+- embedded-graphics クレートの `DrawTarget` トレイトを `FrameBuffer` に実装
 - 基本図形描画（点、線、矩形、円）
-- フォント描画（英数字、日本語？）
+- フォント描画（英数字）
 
-### 設計
+### 実装結果
+
+**コミット**: `978e93b`
+
+`FrameBuffer` に `DrawTarget<Color = Rgb666>` と `OriginDimensions` を実装した。
+独自の `gfx/` モジュールは不要となり、embedded-graphics のエコシステムを
+そのまま利用する構成となった。
 
 ```rust
-// src/gfx/mod.rs
-
-// embedded-graphics の DrawTarget を実装
-use embedded_graphics::prelude::*;
+// src/lcd/framebuffer.rs
 
 impl DrawTarget for FrameBuffer {
     type Color = Rgb666;
     type Error = core::convert::Infallible;
 
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where I: IntoIterator<Item = Pixel<Self::Color>>
-    { ... }
+    where I: IntoIterator<Item = Pixel<Self::Color>> {
+        // 座標をクリッピングし、set_pixel でパディング考慮済みアクセス
+    }
+
+    fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
+        // Rectangle intersection + スライス fill で高速矩形塗りつぶし
+    }
+
+    fn clear(&mut self, color: Self::Color) -> Result<(), Self::Error> {
+        // アクティブ領域のみクリア（パディング領域は BLACK のまま）
+    }
+}
+
+impl OriginDimensions for FrameBuffer {
+    fn size(&self) -> Size { Size::new(400, 96) }
 }
 ```
 
-### 検証内容
-```rust
-// examples/layer6_drawing.rs
-// embedded-graphics で図形やテキストを描画
-// → LCD に描画結果が表示される
-```
+**名前衝突の解決**: `FrameBuffer` には固有の `clear(u32)` メソッドがあり、
+`DrawTarget::clear(Rgb666)` と衝突する。呼び出し側では完全修飾構文
+`<FrameBuffer as DrawTarget>::clear(&mut fb, color)` で解決した。
+
+**fill_solid 最適化**: `draw_iter` のピクセル単位描画に対し、`fill_solid` では
+アクティブ領域との Rectangle intersection を計算し、行ごとにスライス `fill` で
+一括書き込みを行う。大きな矩形の描画で大幅なパフォーマンス向上が得られる。
+
+### デモ内容 (`src/bin/layer6_drawtest.rs`)
+
+- "Hello, 300yen LCD!" テキスト（FONT_6X10）
+- 赤矩形 + 緑円 + 青矩形 + 白線
+- SMPTE 8 色カラーバー（白・黄・シアン・緑・マゼンタ・赤・青・黒）
+- Channel ベースのダブルバッファリング（Layer 5 と同一方式）
 
 ### 合格基準
-- [ ] 点、線、矩形、円が正しく描画される
-- [ ] テキスト表示（英数字）が可能
-- [ ] 描画パフォーマンスが実用的（60fps維持）
+- [x] 点、線、矩形、円が正しく描画される
+- [x] テキスト表示（英数字）が可能
+- [x] 描画パフォーマンスが実用的（60fps 維持）
 
 ---
 

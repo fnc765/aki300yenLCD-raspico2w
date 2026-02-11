@@ -101,6 +101,7 @@ cargo run --bin <ターゲット名> --release
 | `layer3_solid_color` | LCD 固定色表示 |
 | `layer4_dma_colorbar` | DMA カラーバー表示テスト |
 | `layer5_framebuffer` | フレームバッファ + ダブルバッファリング |
+| `layer6_drawtest` | embedded-graphics 描画テスト（テキスト・図形・カラーバー） |
 
 実行例:
 
