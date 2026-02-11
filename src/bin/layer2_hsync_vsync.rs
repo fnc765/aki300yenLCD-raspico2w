@@ -17,7 +17,7 @@
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::peripherals::PIO0;
-use embassy_rp::pio::{Config, Direction, InterruptHandler, Pio};
+use embassy_rp::pio::{Config, Direction, FifoJoin, InterruptHandler, Pio};
 use embassy_rp::pio::program::pio_asm;
 use embassy_rp::bind_interrupts;
 use fixed::FixedU32;
@@ -113,19 +113,18 @@ async fn main(_spawner: Spawner) {
         (PIO_CLK_DIV_INT as u32) << 8 | PIO_CLK_DIV_FRAC as u32,
     );
 
+    cfg.fifo_join = FifoJoin::TxOnly;  // TX FIFO を 8 エントリに拡張
+
     sm.set_config(&cfg);
 
-    // SM起動前にFIFOを事前充填（NCLKグリッチ防止）
-    {
-        let tx = sm.tx();
-        // pull block は FIFO にデータがあれば即座に通過する
-        tx.push(PIO_HSYNC_COUNT);        // VSYNCライン HSYNCパルス
-        tx.push(PIO_REST_COUNT);         // VSYNCライン 残り
-        tx.push(PIO_NORMAL_LINES_COUNT); // 通常ライン数
-        // FIFOは8エントリなのでさらに充填可能
-        tx.push(PIO_HSYNC_COUNT);        // 通常ライン1行目 HSYNC
-        tx.push(PIO_REST_COUNT);         // 通常ライン1行目 残り
-    }
+    // --- FIFO 事前充填（NCLKグリッチ防止） ---
+    // プレフィル: VSYNC(2) + Y(1) + Normal1(2) = 5値 → TxOnly (8エントリ) で安全
+    sm.tx().push(PIO_HSYNC_COUNT);        // VSYNCライン HSYNCパルス
+    sm.tx().push(PIO_REST_COUNT);         // VSYNCライン 残り
+    sm.tx().push(PIO_NORMAL_LINES_COUNT); // 通常ライン数 (Y register)
+    sm.tx().push(PIO_HSYNC_COUNT);        // 通常ライン1行目 HSYNC
+    sm.tx().push(PIO_REST_COUNT);         // 通常ライン1行目 残り
+
     sm.set_enable(true);
 
     info!("PIO started, feeding timing data...");
@@ -136,22 +135,24 @@ async fn main(_spawner: Spawner) {
     let mut frame_count: u32 = 0;
 
     loop {
-        // === VSYNC アクティブライン (1 ライン) ===
-        sm.tx().wait_push(PIO_HSYNC_COUNT).await;  // HSYNC パルスカウント
-        sm.tx().wait_push(PIO_REST_COUNT).await;   // 残りカウント
-
-        // === 通常ラインカウント ===
-        sm.tx().wait_push(PIO_NORMAL_LINES_COUNT).await;  // Y = 110 → 111 ライン
-
-        // === 通常ライン (111 回、PIO の Y-- で管理) ===
-        for _ in 0..V_NORMAL_LINES {
-            sm.tx().wait_push(PIO_HSYNC_COUNT).await;  // HSYNC パルスカウント
-            sm.tx().wait_push(PIO_REST_COUNT).await;   // 残りカウント
+        // === 残りの通常ライン (line 2 ~ V_NORMAL_LINES) ===
+        for _ in 1..V_NORMAL_LINES {
+            sm.tx().wait_push(PIO_HSYNC_COUNT).await;
+            sm.tx().wait_push(PIO_REST_COUNT).await;
         }
 
-        frame_count += 1;
-        if frame_count % 60 == 0 {
-            info!("Frame: {} ({} sec)", frame_count, frame_count / 60);
+        // === 次フレームの VSYNC データ ===
+        sm.tx().wait_push(PIO_HSYNC_COUNT).await;
+        sm.tx().wait_push(PIO_REST_COUNT).await;
+        sm.tx().wait_push(PIO_NORMAL_LINES_COUNT).await;
+
+        // === 次フレームの通常ライン1行目 ===
+        sm.tx().wait_push(PIO_HSYNC_COUNT).await;
+        sm.tx().wait_push(PIO_REST_COUNT).await;
+
+        frame_count = frame_count.wrapping_add(1);
+        if frame_count % (60 * 3) == 0 {
+            info!("Frame {}", frame_count);
         }
     }
 }
