@@ -244,30 +244,42 @@ async fn main(_spawner: Spawner) {
             info!("Color: {} (frame {})", color_names[color_idx], frame_count);
         }
 
-        // 通常ライン (V_NORMAL_LINES = 111 ライン)
-        for _ in 0..V_NORMAL_LINES {
+        // 通常ライン #1 (SM1 データはプレフィル/前ループ末尾で供給済み)
+        // SM0 ピクセルデータのみ
+        for _ in 0..H_BLANK_BEFORE_ACTIVE {
+            sm0.tx().wait_push(BLACK).await;
+        }
+        for _ in 0..H_ACTIVE {
+            sm0.tx().wait_push(color).await;
+        }
+        for _ in 0..H_FRONT_PORCH {
+            sm0.tx().wait_push(BLACK).await;
+        }
+
+        // 通常ライン #2〜#111 (110 ライン)
+        // SM1 タイミング + SM0 ピクセル
+        for _ in 1..V_NORMAL_LINES {
             // SM1 タイミングデータ
             sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
             sm1.tx().wait_push(SM1_REST_COUNT).await;
 
             // SM0 ピクセルデータ
-            // ブランキング (H_BACK_PORCH = 107 NCLK, HSYNC パルス含む)
             for _ in 0..H_BLANK_BEFORE_ACTIVE {
                 sm0.tx().wait_push(BLACK).await;
             }
-            // アクティブ (H_ACTIVE = 400 NCLK)
             for _ in 0..H_ACTIVE {
                 sm0.tx().wait_push(color).await;
             }
-            // フロントポーチ (H_FRONT_PORCH = 5 NCLK)
             for _ in 0..H_FRONT_PORCH {
                 sm0.tx().wait_push(BLACK).await;
             }
         }
 
-        // 次フレームの SM1 VSYNC データ
+        // 次フレームの SM1 VSYNC + 通常ライン #1 データ
         sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
         sm1.tx().wait_push(SM1_VSYNC_REST_COUNT).await;
         sm1.tx().wait_push(SM1_NORMAL_LINES_Y).await;
+        sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
+        sm1.tx().wait_push(SM1_REST_COUNT).await;
     }
 }

@@ -242,23 +242,29 @@ async fn main(_spawner: Spawner) {
     // === メインフレームループ ===
     let mut frame_count: u32 = 0;
     loop {
-        // VSYNC ライン: DMA で 504 黒ピクセルを転送 (プレフィル 8 ワード分は除外)
+        // VSYNC ライン: DMA で黒ピクセルを転送
         sm0.tx().dma_push(dma_ch0.reborrow(), &vsync_remaining, false).await;
 
-        // 通常ライン (111 lines)
-        for _ in 0..V_NORMAL_LINES {
-            // SM1 タイミングデータ (CPU push)
+        // 通常ライン #1 (SM1 データはプレフィル/前ループ末尾で供給済み)
+        // SM0 ピクセルデータのみ DMA 転送
+        sm0.tx().dma_push(dma_ch0.reborrow(), &colorbar_line, false).await;
+
+        // 通常ライン #2〜#111 (110 ライン)
+        for _ in 1..V_NORMAL_LINES {
+            // SM1 タイミングデータ
             sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
             sm1.tx().wait_push(SM1_REST_COUNT).await;
 
-            // SM0 ピクセルデータ (DMA 転送)
+            // SM0 ピクセルデータ
             sm0.tx().dma_push(dma_ch0.reborrow(), &colorbar_line, false).await;
         }
 
-        // 次フレームの VSYNC タイミング
+        // 次フレームの SM1 VSYNC + 通常ライン #1 データ (5値)
         sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
         sm1.tx().wait_push(SM1_VSYNC_REST_COUNT).await;
         sm1.tx().wait_push(SM1_NORMAL_LINES_Y).await;
+        sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
+        sm1.tx().wait_push(SM1_REST_COUNT).await;
 
         frame_count = frame_count.wrapping_add(1);
         if frame_count % (TARGET_FPS * 3) == 0 {
