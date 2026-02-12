@@ -1,11 +1,12 @@
-//! Layer 6: embedded-graphics DrawTarget テスト
+//! Layer 7: 全フレーム一括DMA転送方式
 //!
-//! FrameBuffer の DrawTarget 実装を使って、テキストと図形を描画。
+//! SM0（ピクセル+NCLK）とSM1（HSYNC/VSYNC）をそれぞれ別DMAチャネルで
+//! フレーム全体を一括転送し、行間のCPU介入を排除してジッターを解消する。
 //!
 //! # 合格基準
-//! - [ ] テキストが正しく表示される
-//! - [ ] 図形 (矩形、円、線) が正しく描画される
-//! - [ ] 色が正しい (RGB666)
+//! - [ ] SM0/SM1 両DMAを MULTI_CHAN_TRIGGER で完全同時起動
+//! - [ ] 行間の CPU 介入がない (ジッタフリー)
+//! - [ ] テキスト・図形が正しく表示される
 //! - [ ] ティアリングがない
 
 #![no_std]
@@ -41,6 +42,13 @@ bind_interrupts!(struct Irqs {
 });
 
 // ============================================================
+// SM1 フレームデータ (static 配置)
+// ============================================================
+
+/// SM1 の 1 フレーム分タイミングデータ (225 ワード)
+static SM1_FRAME_DATA: [u32; SM1_FRAME_SIZE] = sm1_frame_data();
+
+// ============================================================
 // ペリフェラル構造体 (TaskFn 16引数制限の回避)
 // ============================================================
 
@@ -69,6 +77,7 @@ struct DisplayPeripherals {
     pin21: Peri<'static, PIN_21>,
     pin22: Peri<'static, PIN_22>,
     dma_ch0: Peri<'static, DMA_CH0>,
+    dma_ch1: Peri<'static, DMA_CH1>,
 }
 
 // ============================================================
@@ -88,24 +97,7 @@ static SWAP_CH: Channel<CriticalSectionRawMutex, &'static mut FrameBuffer, 1> = 
 static RETURN_CH: Channel<CriticalSectionRawMutex, &'static mut FrameBuffer, 1> = Channel::new();
 
 // ============================================================
-// 定数
-// ============================================================
-
-/// VSYNC 後のブランキング通常ライン数
-const V_BLANK_LINES: u32 = V_BACK_PORCH - 1; // 15
-
-// ============================================================
-// DMA バッファ (static 配置でタスクスタック節約)
-// ============================================================
-
-/// VSYNC ラインデータ (全 BLACK, 512 ワード = H_TOTAL)
-static VSYNC_LINE_BUF: [u32; H_TOTAL as usize] = [BLACK; H_TOTAL as usize];
-
-/// ブランキングライン (全 BLACK, 512 ワード)
-static BLACK_LINE_BUF: [u32; LINE_WIDTH] = [BLACK; LINE_WIDTH];
-
-// ============================================================
-// display_task: DMA 転送 + VSYNC swap (Layer 5 と同一)
+// display_task: 全フレーム一括 DMA 転送
 // ============================================================
 
 #[embassy_executor::task]
@@ -113,7 +105,11 @@ async fn display_task(
     res: DisplayPeripherals,
     mut front: &'static mut FrameBuffer,
 ) {
-    let mut dma_ch0 = res.dma_ch0;
+    // DMA CH0/CH1 の所有権を保持（embassy による二重使用を防止）
+    // 両チャネルとも PAC 直接操作 + MULTI_CHAN_TRIGGER で同時起動するため
+    // embassy API では使用しない
+    let _dma_ch0 = res.dma_ch0;
+    let _dma_ch1 = res.dma_ch1;
 
     // === SM0: ピクセル出力 + NCLK (sideset) ===
     // 2命令反転版: side 1 でデータセットアップ、side 0 の立ち下がりでLCDサンプル
@@ -229,14 +225,7 @@ async fn display_task(
     sm0.set_config(&cfg0);
     sm1.set_config(&cfg1);
 
-    // --- FIFO 事前充填 ---
-    sm1.tx().push(SM1_HSYNC_COUNT);
-    sm1.tx().push(SM1_VSYNC_REST_COUNT);
-    sm1.tx().push(SM1_NORMAL_LINES_Y);
-    sm1.tx().push(SM1_HSYNC_COUNT);
-    sm1.tx().push(SM1_REST_COUNT);
-
-    info!("Display task: starting PIO");
+    info!("Display task: starting PIO (full-frame DMA)");
 
     // 両 SM を同時に開始
     common.apply_sm_batch(|batch| {
@@ -244,60 +233,125 @@ async fn display_task(
         batch.set_enable(&mut sm1, true);
     });
 
-    // === フレームループ ===
-    let mut frame_count: u32 = 0;
+    // DMA 書き込み先アドレス (PIO0 TX FIFO) — ループ中不変
+    let sm0_txf_addr = embassy_rp::pac::PIO0.txf(0).as_ptr() as u32;
+    let sm1_txf_addr = embassy_rp::pac::PIO0.txf(1).as_ptr() as u32;
 
-    loop {
-        // --- VSYNC ライン: DMA で黒ピクセルを転送 (512 ワード) ---
-        sm0.tx()
-            .dma_push(dma_ch0.reborrow(), &VSYNC_LINE_BUF, false)
-            .await;
+    // === 初回 DMA 設定: WRITE_ADDR と CTRL は固定のため一度だけ設定 ===
+    {
+        let dma = embassy_rp::pac::DMA;
 
-        // --- 通常ライン #1 (line index 0): ブランキング ---
-        sm0.tx()
-            .dma_push(dma_ch0.reborrow(), &BLACK_LINE_BUF, false)
-            .await;
-
-        // --- 通常ライン #2〜#111 (line index 1〜110) ---
-        for line in 1..V_NORMAL_LINES {
-            // SM1: このラインのタイミングデータをプッシュ (逐次)
-            sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
-            sm1.tx().wait_push(SM1_REST_COUNT).await;
-
-            // DMA 転送
-            if line < V_BLANK_LINES {
-                // ブランキング期間: BLACK ライン送信
-                sm0.tx()
-                    .dma_push(dma_ch0.reborrow(), &BLACK_LINE_BUF, false)
-                    .await;
-            } else {
-                // アクティブ期間: フレームバッファの行を送信
-                let fb_row = (line - V_BLANK_LINES) as usize;
-                sm0.tx()
-                    .dma_push(dma_ch0.reborrow(), front.row_slice(fb_row), false)
-                    .await;
-            }
+        // --- CH0 (SM0: ピクセルデータ) WRITE_ADDR + CTRL ---
+        let ch0 = dma.ch(0);
+        ch0.write_addr().write_value(sm0_txf_addr);
+        // al1_ctrl: 非トリガーエイリアス — 書き込んでもDMA起動しない
+        {
+            let mut ctrl = embassy_rp::pac::dma::regs::CtrlTrig(0);
+            ctrl.set_en(true);
+            ctrl.set_data_size(embassy_rp::pac::dma::vals::DataSize::SIZE_WORD);
+            ctrl.set_incr_read(true);
+            ctrl.set_incr_write(false);
+            ctrl.set_treq_sel(embassy_rp::pac::dma::vals::TreqSel::PIO0_TX0);
+            ctrl.set_chain_to(0); // 自CH = チェイン無効化
+            ch0.al1_ctrl().write_value(ctrl.0);
         }
 
-        // --- 次フレームの SM1 VSYNC + 通常ライン #1 データ (5値) ---
-        sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
-        sm1.tx().wait_push(SM1_VSYNC_REST_COUNT).await;
-        sm1.tx().wait_push(SM1_NORMAL_LINES_Y).await;
-        sm1.tx().wait_push(SM1_HSYNC_COUNT).await;
-        sm1.tx().wait_push(SM1_REST_COUNT).await;
+        // --- CH1 (SM1: HSYNC/VSYNC タイミング) WRITE_ADDR + CTRL ---
+        let ch1 = dma.ch(1);
+        ch1.write_addr().write_value(sm1_txf_addr);
+        {
+            let mut ctrl = embassy_rp::pac::dma::regs::CtrlTrig(0);
+            ctrl.set_en(true);
+            ctrl.set_data_size(embassy_rp::pac::dma::vals::DataSize::SIZE_WORD);
+            ctrl.set_incr_read(true);
+            ctrl.set_incr_write(false);
+            ctrl.set_treq_sel(embassy_rp::pac::dma::vals::TreqSel::PIO0_TX1);
+            ctrl.set_chain_to(1); // 自CH = チェイン無効化
+            ch1.al1_ctrl().write_value(ctrl.0);
+        }
+    }
+
+    // === フレームループ: 全フレーム一括 DMA 転送 ===
+    //
+    // 方式: MULTI_CHAN_TRIGGER による完全同時起動
+    //   - 初回含め毎フレーム READ_ADDR + TRANS_COUNT を再設定
+    //   - DMA設定〜TRIGGERをクリティカルセクションで保護し、
+    //     割り込みによるFIFOデータ途切れを防止
+    //   - FIFO drain待ちは行わない（次DMAが即座にデータ供給し途切れなし）
+    let mut frame_count: u32 = 0;
+
+    // 初回フレーム起動（クリティカルセクション内）
+    cortex_m::interrupt::free(|_| {
+        let dma = embassy_rp::pac::DMA;
+
+        let ch0 = dma.ch(0);
+        ch0.read_addr()
+            .write_value(front.frame_data().as_ptr() as u32);
+        ch0.trans_count().write(|w| {
+            w.set_count(front.frame_data().len() as u32);
+        });
+
+        let ch1 = dma.ch(1);
+        ch1.read_addr()
+            .write_value(SM1_FRAME_DATA.as_ptr() as u32);
+        ch1.trans_count().write(|w| {
+            w.set_count(SM1_FRAME_SIZE as u32);
+        });
+
+        dma.multi_chan_trigger().write(|w| {
+            w.set_multi_chan_trigger(0b11);
+        });
+    });
+
+    loop {
+        // --- CH0 完了待ち (ポーリング + yield) ---
+        // CH0 (SM0, 57344ワード) は CH1 (SM1, 225ワード) より後に完了する。
+        // CH0 の BUSY=false を待てば両チャネルとも完了済み。
+        let dma = embassy_rp::pac::DMA;
+        loop {
+            if !dma.ch(0).ctrl_trig().read().busy() {
+                break;
+            }
+            embassy_futures::yield_now().await;
+        }
+
+        // VSYNC 境界: swap チェック
+        if let Ok(new_front) = SWAP_CH.try_receive() {
+            RETURN_CH.send(front).await;
+            front = new_front;
+        }
+
+        // クリティカルセクション: DMA再設定〜TRIGGERを割り込み無しで実行
+        // FIFO残データが消費される前に次DMAを開始し、データ途切れを防ぐ
+        // WRITE_ADDR, CTRL は固定のため再設定不要（初回のみ設定済み）
+        cortex_m::interrupt::free(|_| {
+            let dma = embassy_rp::pac::DMA;
+
+            // CH0: READ_ADDR + TRANS_COUNT のみ再設定
+            let ch0 = dma.ch(0);
+            ch0.read_addr()
+                .write_value(front.frame_data().as_ptr() as u32);
+            ch0.trans_count().write(|w| {
+                w.set_count(front.frame_data().len() as u32);
+            });
+
+            // CH1: READ_ADDR + TRANS_COUNT のみ再設定
+            let ch1 = dma.ch(1);
+            ch1.read_addr()
+                .write_value(SM1_FRAME_DATA.as_ptr() as u32);
+            ch1.trans_count().write(|w| {
+                w.set_count(SM1_FRAME_SIZE as u32);
+            });
+
+            // 両チャネル同時起動
+            dma.multi_chan_trigger().write(|w| {
+                w.set_multi_chan_trigger(0b11);
+            });
+        });
 
         frame_count = frame_count.wrapping_add(1);
         if frame_count % (TARGET_FPS * 3) == 0 {
             info!("Display running (frame {})", frame_count);
-        }
-
-        // --- フレーム境界: SM0 クロック分周器位相リセット ---
-        sm0.clkdiv_restart();
-
-        // --- VSYNC 境界: swap チェック ---
-        if let Ok(new_front) = SWAP_CH.try_receive() {
-            RETURN_CH.send(front).await;
-            front = new_front;
         }
     }
 }
@@ -309,7 +363,7 @@ async fn display_task(
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
-    info!("Layer 6: embedded-graphics DrawTarget test");
+    info!("Layer 7: full-frame DMA transfer");
 
     // フレームバッファ初期化 (BSS 領域から &'static mut を取得)
     // Safety: 各バッファは初期化後、一方が display_task に、他方が main に
@@ -344,6 +398,7 @@ async fn main(spawner: Spawner) {
                 pin21: p.PIN_21,
                 pin22: p.PIN_22,
                 dma_ch0: p.DMA_CH0,
+                dma_ch1: p.DMA_CH1,
             },
             fb_a,
         ))
@@ -368,7 +423,7 @@ async fn main(spawner: Spawner) {
         .unwrap();
 
         Text::new(
-            "embedded-graphics",
+            "Full-frame DMA",
             embedded_graphics::geometry::Point::new(10, 26),
             text_style,
         )

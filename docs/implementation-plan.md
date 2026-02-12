@@ -9,6 +9,7 @@
 **ハードウェアが手元に届いた時点で Layer 0 から順に動作確認**できるようにする。
 
 ```
+Layer 7: 全フレーム DMA 転送（ジッター解消）
 Layer 6: アプリケーション（embedded-graphics DrawTarget）✅
 Layer 5: フレームバッファ管理 + ダブルバッファリング  ✅
 Layer 4: DMA 転送（フレームバッファ → PIO FIFO）     ✅
@@ -18,7 +19,7 @@ Layer 1: PIO ピクセル出力（RGB + NCLK）              ✅
 Layer 0: GPIO 基本動作確認（トグルテスト）             ✅
 ```
 
-> **全 Layer (0–6) 完了** — LCD ドライバスタック全層の実装・検証が完了しました。
+> **Layer 0–6 完了** — Layer 7 で横ジッター解消のため全フレーム DMA 転送方式に移行予定。
 
 ### フレームワーク選択: Embassy
 
@@ -423,6 +424,89 @@ impl OriginDimensions for FrameBuffer {
 
 ---
 
+## Layer 7: 全フレーム DMA 転送
+
+### 目的
+- Layer 6 の横ジッター（SM0 FIFO アンダーラン）を根本解消
+- SM0 に加え SM1 も DMA 化し、1フレームあたりの CPU 介入をゼロにする
+
+### 問題の原因
+
+Layer 6 では SM0 のピクセルデータを 1行ずつ DMA 転送し、SM1 には CPU が
+`wait_push` でタイミングデータを供給していた。行間の CPU 介入
+（DMA 再設定 + SM1 push）が散発的に SM0 TX FIFO バッファ（8エントリ ≈ 2.3μs）を
+超過し、PIO が `out pins` で停止 → NCLK 一時停止 → 横ジッターとなっていた。
+
+### 解決策: デュアル DMA 全フレーム転送
+
+```text
+DMA_CH0 → SM0: 拡張フレームバッファ 57,344 ワード (512×112) 一括転送
+DMA_CH1 → SM1: タイミングバッファ 225 ワード 一括転送
+
+embassy_futures::join::join(dma_ch0, dma_ch1) で並行実行
+```
+
+### フレームバッファ拡張
+
+V-blank 期間 (16行) をフレームバッファ先頭に含める:
+
+```text
+行 0-15:   [BLACK × 512]  (V-blank)
+行 16-111: [107 BLACK | 400 active | 5 BLACK]  (アクティブ)
+
+合計: 512 × 112 = 57,344 ワード = 224 KB / バッファ
+```
+
+アプリケーション側は `set_pixel(x, y)` の内部オフセットが変わるのみで、
+(0,0) 基準の座標体系は同一。
+
+### SM1 タイミングバッファ
+
+Layer 6 の CPU `wait_push` を置き換える静的バッファ:
+
+```text
+[SM1_HSYNC_COUNT, SM1_VSYNC_REST_COUNT, SM1_NORMAL_LINES_Y,
+ SM1_HSYNC_COUNT, SM1_REST_COUNT,  ← 通常ライン #1
+ SM1_HSYNC_COUNT, SM1_REST_COUNT,  ← 通常ライン #2
+ ...
+ SM1_HSYNC_COUNT, SM1_REST_COUNT]  ← 通常ライン #111
+
+合計: 3 + 2 × 111 = 225 ワード (900 bytes)
+```
+
+### メモリ使用量
+
+```text
+拡張 FB ×2: 224 KB × 2 = 448 KB
+SM1 buf:    ≈ 1 KB
+合計:       449 KB / 520 KB SRAM (86%)
+残り:       71 KB
+```
+
+### DMA チャネル
+
+| チャネル | 用途 | ワード数 |
+|---------|------|---------|
+| DMA_CH0 | SM0 ピクセルデータ | 57,344 |
+| DMA_CH1 | SM1 タイミングデータ | 225 |
+
+### 検証内容
+```rust
+// src/bin/layer7_fullframe_dma.rs
+// DMA_CH0: 拡張フレームバッファ → SM0 TX FIFO (57,344 ワード一括)
+// DMA_CH1: タイミングバッファ → SM1 TX FIFO (225 ワード一括)
+// join で両 DMA を並行実行
+// → 横ジッターが解消された滑らかな表示
+```
+
+### 合格基準
+- [ ] 横ジッターが完全に解消されている
+- [ ] 60fps を維持できている
+- [ ] ダブルバッファリング + VSYNC swap が正常に動作する
+- [ ] NCLK が全フレームを通じて連続している
+
+---
+
 ## 依存クレート
 
 ```toml
@@ -471,6 +555,7 @@ elf2uf2-rs target/thumbv8m.main-none-eabihf/release/examples/layer0_gpio_test
 | Layer 4 | 目視 + defmt | テストパターン表示 |
 | Layer 5 | 目視 + FPS カウンタ | アニメーション・ティアリング |
 | Layer 6 | 目視 | 描画正確性 |
+| Layer 7 | 目視 + ロジアナ | ジッター解消・NCLK連続性 |
 
 ### 問題切り分け手順
 

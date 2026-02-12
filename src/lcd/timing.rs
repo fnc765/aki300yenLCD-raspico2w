@@ -44,17 +44,12 @@ pub const SYS_CLOCK_HZ: u32 = 150_000_000;
 /// PIO クロック分周比 (整数部)
 /// NCLK は 2 PIO サイクルで 1 ピクセル (HIGH + LOW)
 /// 分周比 = SYS_CLOCK / (PIXEL_CLOCK × 2) = 150_000_000 / (3_440_640 × 2) ≈ 21.8
-pub const PIO_CLK_DIV_INT: u16 = (SYS_CLOCK_HZ / (PIXEL_CLOCK_HZ * 2)) as u16; // 21
+pub const PIO_CLK_DIV_INT: u16 = (SYS_CLOCK_HZ / (PIXEL_CLOCK_HZ * 2)) as u16; // = 21
 
 /// PIO クロック分周比 (小数部, 0-255)
-/// 余り = SYS_CLOCK - INT × PIXEL_CLOCK × 2
-/// frac = 余り × 256 / (PIXEL_CLOCK × 2) ≈ 204.35 → 四捨五入で 205
 pub const PIO_CLK_DIV_FRAC: u8 = {
-    let remainder = SYS_CLOCK_HZ - (PIO_CLK_DIV_INT as u32) * PIXEL_CLOCK_HZ * 2;
-    let frac_512 = remainder * 512 / (PIXEL_CLOCK_HZ * 2);
-    // 四捨五入: (remainder * 512 / (PIXEL_CLOCK * 2) + 1) / 2
-    let frac_rounded = (frac_512 + 1) / 2;
-    frac_rounded as u8
+    let remainder = SYS_CLOCK_HZ % (PIXEL_CLOCK_HZ * 2);
+    ((remainder as u64 * 256) / (PIXEL_CLOCK_HZ as u64 * 2)) as u8
 };
 
 // ============================================================
@@ -128,3 +123,35 @@ pub const SM1_CLK_DIV_BITS: u32 = ((PIO_CLK_DIV_INT as u32) << 8 | PIO_CLK_DIV_F
 
 /// 表示前ブランキングピクセル数 (= H_BACK_PORCH, HSYNCパルス含む)
 pub const H_BLANK_BEFORE_ACTIVE: u32 = H_BACK_PORCH; // 107
+
+// ============================================================
+// Layer 7: 全フレーム DMA 用定数・関数
+// ============================================================
+
+/// SM1 が 1 フレームで消費するワード数
+///
+/// - VSYNC 行: 3 ワード (`SM1_HSYNC_COUNT` + `SM1_VSYNC_REST_COUNT` + `SM1_NORMAL_LINES_Y`)
+/// - 通常行: 2 ワード × (V_TOTAL − 1) = 2 × 111 = 222 ワード
+/// - 合計: 225 ワード
+pub const SM1_FRAME_SIZE: usize = 3 + 2 * (V_TOTAL as usize - 1);
+
+/// SM1 の 1 フレーム分のタイミングデータを生成する
+///
+/// SM1 PIO プログラムの pull 順序:
+///   1. `SM1_HSYNC_COUNT`      — VSYNC ライン HSYNC ループ
+///   2. `SM1_VSYNC_REST_COUNT` — VSYNC ライン 残りループ
+///   3. `SM1_NORMAL_LINES_Y`   — 通常ラインの Y カウンタ (jmp y--)
+///   4–225. `SM1_HSYNC_COUNT`, `SM1_REST_COUNT` を 111 回繰り返し
+pub const fn sm1_frame_data() -> [u32; SM1_FRAME_SIZE] {
+    let mut buf = [0u32; SM1_FRAME_SIZE];
+    buf[0] = SM1_HSYNC_COUNT;
+    buf[1] = SM1_VSYNC_REST_COUNT;
+    buf[2] = SM1_NORMAL_LINES_Y;
+    let mut i: usize = 0;
+    while i < (V_TOTAL as usize - 1) {
+        buf[3 + i * 2] = SM1_HSYNC_COUNT;
+        buf[3 + i * 2 + 1] = SM1_REST_COUNT;
+        i += 1;
+    }
+    buf
+}

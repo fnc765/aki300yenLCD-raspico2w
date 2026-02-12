@@ -1,11 +1,12 @@
 //! フレームバッファ管理
 //!
-//! 512×96 パディング方式: 各ライン = [107 BLACK | 400 active | 5 BLACK]
-//! DMA 転送時にブランキング挿入不要で、Layer 4 と同一の転送パターンを使用。
+//! 512×112 全フレーム方式: 各ライン = [107 BLACK | 400 active | 5 BLACK]
+//! 先頭16行 (V-blank) は常に BLACK。アクティブ描画は行16-111。
+//! DMA 転送時はフレーム全体 (112行) を一括転送可能。
 
 #![allow(dead_code)]
 
-use crate::lcd::timing::{H_ACTIVE, H_BLANK_BEFORE_ACTIVE, H_TOTAL};
+use crate::lcd::timing::{H_ACTIVE, H_BLANK_BEFORE_ACTIVE, H_TOTAL, V_BACK_PORCH, V_TOTAL};
 use embedded_graphics::geometry::Size;
 use embedded_graphics::pixelcolor::{Rgb666, RgbColor};
 use embedded_graphics::prelude::*;
@@ -17,8 +18,14 @@ pub const LINE_WIDTH: usize = H_TOTAL as usize; // 512
 /// アクティブ高さ
 pub const ACTIVE_HEIGHT: usize = 96;
 
+/// フレーム全体のライン数 (V_TOTAL)
+pub const FRAME_LINES: usize = V_TOTAL as usize; // 112
+
+/// アクティブ領域の Y オフセット (V-blank 行数: VSYNC 1行 + Vブランキング 15行)
+pub const ACTIVE_Y_OFFSET: usize = V_BACK_PORCH as usize; // 16
+
 /// フレームバッファサイズ (ワード数)
-pub const FB_SIZE: usize = LINE_WIDTH * ACTIVE_HEIGHT; // 49,152
+pub const FB_SIZE: usize = LINE_WIDTH * FRAME_LINES; // 57,344
 
 /// 6ビット値のビット順を反転 (MSB↔LSB)
 ///
@@ -52,13 +59,15 @@ const MAX_Y: u32 = ACTIVE_HEIGHT as u32 - 1; // 95
 
 /// フレームバッファ
 ///
-/// 内部レイアウト: `[u32; 512 * 96]`
-/// 各ライン: `[107 BLACK] [400 active pixels] [5 BLACK]`
+/// 内部レイアウト: `[u32; 512 * 112]`
+/// 行 0-15: V-blank 領域 (常に BLACK)
+/// 行 16-111: アクティブ領域 (各ライン: `[107 BLACK] [400 active pixels] [5 BLACK]`)
 ///
-/// パディング領域は初期化時に BLACK で埋められ、
-/// `set_pixel()` / `clear()` はアクティブ領域のみ操作する。
+/// 全領域は初期化時に BLACK で埋められ、
+/// `set_pixel()` / `clear()` はアクティブ領域 (行16-111) のみ操作する。
+/// `frame_data()` でフレーム全体 (112行) を DMA 転送用に取得可能。
 ///
-/// メモリ使用量: 49,152 × 4 = 196,608 bytes (192 KB) / バッファ
+/// メモリ使用量: 57,344 × 4 = 229,376 bytes (224 KB) / バッファ
 pub struct FrameBuffer {
     pub data: [u32; FB_SIZE],
 }
@@ -81,7 +90,7 @@ impl FrameBuffer {
     pub fn set_pixel(&mut self, x: usize, y: usize, color: u32) {
         debug_assert!(x < H_ACTIVE as usize && y < ACTIVE_HEIGHT, "set_pixel: ({}, {}) out of range", x, y);
         if x < H_ACTIVE as usize && y < ACTIVE_HEIGHT {
-            let offset = y * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize + x;
+            let offset = (ACTIVE_Y_OFFSET + y) * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize + x;
             self.data[offset] = color;
         }
     }
@@ -91,7 +100,7 @@ impl FrameBuffer {
     pub fn get_pixel(&self, x: usize, y: usize) -> u32 {
         debug_assert!(x < H_ACTIVE as usize && y < ACTIVE_HEIGHT, "get_pixel: ({}, {}) out of range", x, y);
         if x < H_ACTIVE as usize && y < ACTIVE_HEIGHT {
-            let offset = y * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize + x;
+            let offset = (ACTIVE_Y_OFFSET + y) * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize + x;
             self.data[offset]
         } else {
             BLACK
@@ -101,19 +110,26 @@ impl FrameBuffer {
     /// DMA 転送用ライン参照を取得
     ///
     /// ライン y (0..96) の 512 ワード全体を返す。
+    /// 内部的に ACTIVE_Y_OFFSET を加算してフレームバッファ内の正しい位置を参照する。
     #[inline]
     pub fn row_slice(&self, y: usize) -> &[u32] {
         debug_assert!(y < ACTIVE_HEIGHT, "row_slice: y={} out of range (max {})", y, ACTIVE_HEIGHT - 1);
-        let start = y * LINE_WIDTH;
+        let start = (ACTIVE_Y_OFFSET + y) * LINE_WIDTH;
         &self.data[start..start + LINE_WIDTH]
+    }
+
+    /// DMA 転送用のフレーム全体データへの参照を返す（112行×512ワード）
+    #[inline]
+    pub fn frame_data(&self) -> &[u32] {
+        &self.data[..]
     }
 
     /// アクティブ領域を指定色でクリア
     ///
-    /// パディング領域 (BLACK) は変更しない。
+    /// V-blank 領域 (行0-15) およびパディング領域 (BLACK) は変更しない。
     pub fn clear(&mut self, color: u32) {
         for y in 0..ACTIVE_HEIGHT {
-            let start = y * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize;
+            let start = (ACTIVE_Y_OFFSET + y) * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize;
             let end = start + H_ACTIVE as usize;
             self.data[start..end].fill(color);
         }
@@ -167,7 +183,7 @@ impl DrawTarget for FrameBuffer {
             let y_end = y_start + clipped.size.height as usize;
 
             for y in y_start..y_end {
-                let row_start = y * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize + x_start;
+                let row_start = (ACTIVE_Y_OFFSET + y) * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize + x_start;
                 let row_end = row_start + (x_end - x_start);
                 self.data[row_start..row_end].fill(word);
             }
@@ -178,9 +194,9 @@ impl DrawTarget for FrameBuffer {
 
     fn clear(&mut self, color: Self::Color) -> Result<(), Self::Error> {
         let word = rgb666(color.r() as u32, color.g() as u32, color.b() as u32);
-        // パディング領域は変更しない（BLACKのまま）
+        // V-blank 領域 (行0-15) およびパディング領域は変更しない（BLACKのまま）
         for y in 0..ACTIVE_HEIGHT {
-            let start = y * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize;
+            let start = (ACTIVE_Y_OFFSET + y) * LINE_WIDTH + H_BLANK_BEFORE_ACTIVE as usize;
             let end = start + H_ACTIVE as usize;
             self.data[start..end].fill(word);
         }

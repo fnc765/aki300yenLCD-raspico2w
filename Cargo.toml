@@ -72,3 +72,7 @@ path = "src/bin/layer5_framebuffer.rs"
 [[bin]]
 name = "layer6_drawtest"
 path = "src/bin/layer6_drawtest.rs"
+
+[[bin]]
+name = "layer7_fullframe_dma"
+path = "src/bin/layer7_fullframe_dma.rs"
