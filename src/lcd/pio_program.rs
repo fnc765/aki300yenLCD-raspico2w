@@ -2,7 +2,7 @@
 //!
 //! LTA042B010F は NCLK の**立ち下がりエッジ**でデータをサンプルする。
 //! したがって、PIO sideset で NCLK を制御し、
-//! データ出力時に NCLK=LOW → LCD がサンプルという順序にする。
+//! NCLK=HIGH でデータ出力（セットアップ） → NCLK=LOW への立ち下がりで LCD がサンプルという順序にする。
 //!
 //! # ⚠️ NCLK 停止リスク
 //!
@@ -23,14 +23,14 @@
 /// - autopull 有効
 ///
 /// 動作:
-/// 1. out pins, 18 + side 0 → RGB データ出力 + NCLK LOW (LCD サンプル)
-/// 2. nop + side 1 → NCLK HIGH (次のデータ準備)
+/// 1. out pins, 18 + side 1 → RGB データ出力 + NCLK HIGH (セットアップ期間)
+/// 2. nop + side 0 → NCLK LOW (立ち下がりエッジで LCD サンプル)
 pub const PIXEL_OUT_PROGRAM: &str = r#"
 .side_set 1
 
 .wrap_target
-    out pins, 18  side 0    ; RGB出力 + NCLK=LOW (LCDがサンプル)
-    nop           side 1    ; NCLK=HIGH (データ安定)
+    out pins, 18  side 1    ; RGB出力 + NCLK=HIGH (セットアップ期間)
+    nop           side 0    ; NCLK=LOW (立ち下がりでLCDサンプル)
 .wrap
 "#;
 
@@ -44,8 +44,8 @@ pub const PIXEL_OUT_PROGRAM: &str = r#"
 // let prg = pio_asm!(
 //     ".side_set 1",
 //     ".wrap_target",
-//     "    out pins, 18  side 0",
-//     "    nop           side 1",
+//     "    out pins, 18  side 1",
+//     "    nop           side 0",
 //     ".wrap",
 // );
 // ```
@@ -217,8 +217,8 @@ pub const PIXEL_OUT_PROGRAM: &str = r#"
 // ```asm
 // .side_set 1
 // .wrap_target
-//     out pins, 18  side 0    ; ピクセル出力 + NCLK LOW (LCD サンプル)
-//     nop           side 1    ; NCLK HIGH
+//     out pins, 18  side 1    ; ピクセル出力 + NCLK HIGH (セットアップ期間)
+//     nop           side 0    ; NCLK LOW (立ち下がりでLCDサンプル)
 // .wrap
 // ```
 //
