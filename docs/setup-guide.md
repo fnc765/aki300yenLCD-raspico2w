@@ -102,12 +102,22 @@ cargo run --bin <ターゲット名> --release
 | `layer4_dma_colorbar` | DMA カラーバー表示テスト |
 | `layer5_framebuffer` | フレームバッファ + ダブルバッファリング |
 | `layer6_drawtest` | embedded-graphics 描画テスト（テキスト・図形・カラーバー） |
+| `layer7_fullframe_dma` | 全フレーム DMA + LCD HUD 計測（`CPUms`/`FRMms` の L/M 表示） |
 
 実行例:
 
 ```powershell
 cargo run --bin layer0_gpio_test --release
 ```
+
+Layer 7 の計測表示を確認する場合は次を実行してください。
+
+```powershell
+cargo run --bin layer7_fullframe_dma --release
+```
+
+LCD 右上に `CPUms L/M` と `FRMms L/M` が表示され、シリアルログを見ずに
+描画CPU時間とフレームループ時間を観測できます。
 
 ## トラブルシューティング
 

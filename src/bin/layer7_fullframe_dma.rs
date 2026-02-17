@@ -13,7 +13,7 @@
 #![no_main]
 
 use core::ptr::addr_of_mut;
-use defmt::*;
+use core::sync::atomic::{AtomicU32, Ordering};
 use embassy_executor::Spawner;
 use embassy_rp::bind_interrupts;
 use embassy_rp::peripherals::*;
@@ -24,6 +24,7 @@ use embassy_rp::pio::{
 use embassy_rp::Peri;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
+use embassy_time::Instant;
 use embedded_graphics::geometry::Size;
 use embedded_graphics::mono_font::ascii::FONT_6X10;
 use embedded_graphics::mono_font::MonoTextStyle;
@@ -95,6 +96,68 @@ static SWAP_CH: Channel<CriticalSectionRawMutex, &'static mut FrameBuffer, 1> = 
 
 /// display_task → main: 使用済み front バッファの所有権を返却
 static RETURN_CH: Channel<CriticalSectionRawMutex, &'static mut FrameBuffer, 1> = Channel::new();
+
+// ============================================================
+// 計測統計 (lock-free)
+// ============================================================
+
+/// main 描画処理時間（CPUのみ）[ms] 最新値
+static DRAW_CPU_MS_LATEST: AtomicU32 = AtomicU32::new(0);
+
+/// main 描画処理時間（CPUのみ）[ms] 最大値
+static DRAW_CPU_MS_MAX: AtomicU32 = AtomicU32::new(0);
+
+/// main フレームループ全体時間（描画+待機）[ms] 最新値
+static FRAME_LOOP_MS_LATEST: AtomicU32 = AtomicU32::new(0);
+
+/// main フレームループ全体時間（描画+待機）[ms] 最大値
+static FRAME_LOOP_MS_MAX: AtomicU32 = AtomicU32::new(0);
+
+/// display_task フレーム境界区間（swap判定+DMA再起動）時間 [us] 最新値
+static DISPLAY_BOUNDARY_SECTION_US_LATEST: AtomicU32 = AtomicU32::new(0);
+
+/// display_task フレーム境界区間（swap判定+DMA再起動）時間 [us] 最大値
+static DISPLAY_BOUNDARY_SECTION_US_MAX: AtomicU32 = AtomicU32::new(0);
+
+const HUD_X: i32 = 230;
+const HUD_LINE1_Y: i32 = 12;
+const HUD_LINE2_Y: i32 = 24;
+const HUD_UPDATE_INTERVAL_FRAMES: u32 = 8;
+
+fn saturating_u64_to_u32(v: u64) -> u32 {
+    if v > u32::MAX as u64 {
+        u32::MAX
+    } else {
+        v as u32
+    }
+}
+
+fn update_max_atomic(max: &AtomicU32, value: u32) {
+    let mut observed = max.load(Ordering::Relaxed);
+    while value > observed {
+        match max.compare_exchange_weak(observed, value, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(next_observed) => observed = next_observed,
+        }
+    }
+}
+
+fn write_u32_decimal<const N: usize>(mut value: u32, buf: &mut [u8; N]) -> &str {
+    let mut idx = N;
+    if value == 0 {
+        idx -= 1;
+        buf[idx] = b'0';
+    } else {
+        while value > 0 {
+            idx -= 1;
+            buf[idx] = b'0' + (value % 10) as u8;
+            value /= 10;
+        }
+    }
+
+    // Safety: buf[idx..] はASCII数字のみで構成される
+    unsafe { core::str::from_utf8_unchecked(&buf[idx..]) }
+}
 
 // ============================================================
 // display_task: 全フレーム一括 DMA 転送
@@ -225,8 +288,6 @@ async fn display_task(
     sm0.set_config(&cfg0);
     sm1.set_config(&cfg1);
 
-    info!("Display task: starting PIO (full-frame DMA)");
-
     // 両 SM を同時に開始
     common.apply_sm_batch(|batch| {
         batch.set_enable(&mut sm0, true);
@@ -278,8 +339,6 @@ async fn display_task(
     //   - DMA設定〜TRIGGERをクリティカルセクションで保護し、
     //     割り込みによるFIFOデータ途切れを防止
     //   - FIFO drain待ちは行わない（次DMAが即座にデータ供給し途切れなし）
-    let mut frame_count: u32 = 0;
-
     // 初回フレーム起動（クリティカルセクション内）
     cortex_m::interrupt::free(|_| {
         let dma = embassy_rp::pac::DMA;
@@ -315,6 +374,8 @@ async fn display_task(
             embassy_futures::yield_now().await;
         }
 
+        let boundary_start = Instant::now();
+
         // VSYNC 境界: swap チェック
         if let Ok(new_front) = SWAP_CH.try_receive() {
             RETURN_CH.send(front).await;
@@ -349,10 +410,9 @@ async fn display_task(
             });
         });
 
-        frame_count = frame_count.wrapping_add(1);
-        if frame_count % (TARGET_FPS * 3) == 0 {
-            info!("Display running (frame {})", frame_count);
-        }
+        let boundary_us = saturating_u64_to_u32(boundary_start.elapsed().as_micros());
+        DISPLAY_BOUNDARY_SECTION_US_LATEST.store(boundary_us, Ordering::Relaxed);
+        update_max_atomic(&DISPLAY_BOUNDARY_SECTION_US_MAX, boundary_us);
     }
 }
 
@@ -363,7 +423,6 @@ async fn display_task(
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
-    info!("Layer 7: full-frame DMA transfer");
 
     // フレームバッファ初期化 (BSS 領域から &'static mut を取得)
     // Safety: 各バッファは初期化後、一方が display_task に、他方が main に
@@ -406,11 +465,37 @@ async fn main(spawner: Spawner) {
 
     // メインタスク: embedded-graphics で描画
     let mut back: &'static mut FrameBuffer = fb_b;
-    let mut frame: u32 = 0;
+    let mut hud_div: u32 = 0;
 
     let text_style = MonoTextStyle::new(&FONT_6X10, Rgb666::WHITE);
 
+    let mut draw_cpu_latest_buf = [0u8; 10];
+    let mut draw_cpu_max_buf = [0u8; 10];
+    let mut frame_loop_latest_buf = [0u8; 10];
+    let mut frame_loop_max_buf = [0u8; 10];
+
+    let mut draw_cpu_latest_text: &str = "0";
+    let mut draw_cpu_max_text: &str = "0";
+    let mut frame_loop_latest_text: &str = "0";
+    let mut frame_loop_max_text: &str = "0";
+
     loop {
+        let frame_loop_start = Instant::now();
+
+        if hud_div == 0 {
+            let draw_cpu_latest = DRAW_CPU_MS_LATEST.load(Ordering::Relaxed);
+            let draw_cpu_max = DRAW_CPU_MS_MAX.load(Ordering::Relaxed);
+            let frame_loop_latest = FRAME_LOOP_MS_LATEST.load(Ordering::Relaxed);
+            let frame_loop_max = FRAME_LOOP_MS_MAX.load(Ordering::Relaxed);
+
+            draw_cpu_latest_text = write_u32_decimal(draw_cpu_latest, &mut draw_cpu_latest_buf);
+            draw_cpu_max_text = write_u32_decimal(draw_cpu_max, &mut draw_cpu_max_buf);
+            frame_loop_latest_text = write_u32_decimal(frame_loop_latest, &mut frame_loop_latest_buf);
+            frame_loop_max_text = write_u32_decimal(frame_loop_max, &mut frame_loop_max_buf);
+        }
+
+        let draw_cpu_start = Instant::now();
+
         DrawTarget::clear(back, Rgb666::BLACK).unwrap();
 
         // テキスト描画
@@ -485,12 +570,76 @@ async fn main(spawner: Spawner) {
             .unwrap();
         }
 
+        // 計測 HUD (右上固定、表示内容は間引き更新)
+        Text::new(
+            "CPUms L:",
+            embedded_graphics::geometry::Point::new(HUD_X, HUD_LINE1_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+        Text::new(
+            draw_cpu_latest_text,
+            embedded_graphics::geometry::Point::new(HUD_X + 45, HUD_LINE1_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+        Text::new(
+            " M:",
+            embedded_graphics::geometry::Point::new(HUD_X + 75, HUD_LINE1_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+        Text::new(
+            draw_cpu_max_text,
+            embedded_graphics::geometry::Point::new(HUD_X + 93, HUD_LINE1_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+
+        Text::new(
+            "FRMms L:",
+            embedded_graphics::geometry::Point::new(HUD_X, HUD_LINE2_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+        Text::new(
+            frame_loop_latest_text,
+            embedded_graphics::geometry::Point::new(HUD_X + 45, HUD_LINE2_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+        Text::new(
+            " M:",
+            embedded_graphics::geometry::Point::new(HUD_X + 75, HUD_LINE2_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+        Text::new(
+            frame_loop_max_text,
+            embedded_graphics::geometry::Point::new(HUD_X + 93, HUD_LINE2_Y),
+            text_style,
+        )
+        .draw(back)
+        .unwrap();
+
+        let draw_cpu_ms = saturating_u64_to_u32(draw_cpu_start.elapsed().as_millis());
+        DRAW_CPU_MS_LATEST.store(draw_cpu_ms, Ordering::Relaxed);
+        update_max_atomic(&DRAW_CPU_MS_MAX, draw_cpu_ms);
+
         SWAP_CH.send(back).await;
         back = RETURN_CH.receive().await;
 
-        frame = frame.wrapping_add(1);
-        if frame % (TARGET_FPS * 5) == 0 {
-            info!("DrawTarget running (frame {})", frame);
-        }
+        let frame_loop_ms = saturating_u64_to_u32(frame_loop_start.elapsed().as_millis());
+        FRAME_LOOP_MS_LATEST.store(frame_loop_ms, Ordering::Relaxed);
+        update_max_atomic(&FRAME_LOOP_MS_MAX, frame_loop_ms);
+
+        hud_div = (hud_div + 1) % HUD_UPDATE_INTERVAL_FRAMES;
     }
 }

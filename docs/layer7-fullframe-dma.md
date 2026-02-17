@@ -6,6 +6,10 @@ Layer 7 は SM0（ピクセル+NCLK）と SM1（HSYNC/VSYNC）の両方を独立
 一括転送する方式である。1フレームあたりの CPU 介入をゼロにし、
 Layer 6 で発生していた横ジッターを根本的に解消する。
 
+あわせて LCD 右上に計測 HUD を表示し、`CPUms`（描画 CPU 時間）と
+`FRMms`（フレームループ時間）を **最新値 (L)** と **最大値 (M)** で確認できる。
+シリアルログに依存せず、画面上で継続観測できる。
+
 ## 背景: Layer 6 の問題
 
 Layer 6 では SM0 のピクセルデータを **1行ずつ DMA 転送** していた:
@@ -53,11 +57,12 @@ embassy_futures::join::join(dma_ch0, dma_ch1)
 ```rust
 // 擬似コード
 loop {
-    // 両 DMA を同時開始、両方完了まで待機
-    embassy_futures::join::join(
-        sm0.tx().dma_push(dma_ch0, &extended_fb.data, false),
-        sm1.tx().dma_push(dma_ch1, &sm1_timing_buf, false),
-    ).await;
+  // CH0/CH1 の READ_ADDR + TRANS_COUNT を設定
+  // MULTI_CHAN_TRIGGER(0b11) で両 DMA を完全同時起動
+  start_both_dma();
+
+  // CH0 完了待ち（CH1 は先に完了する）
+  wait_until_ch0_not_busy().await;
 
     // VSYNC 境界: バッファスワップ
     if let Ok(new_front) = SWAP_CH.try_receive() {
@@ -66,6 +71,30 @@ loop {
     }
 }
 ```
+
+## 計測 HUD（LCD 右上）
+
+HUD は 2 行で以下の指標を表示する。
+
+| 表示 | 意味 | 単位 | 集計 |
+|------|------|------|------|
+| `CPUms L` | 描画処理の CPU 実行時間（`DrawTarget::clear`〜HUD 描画完了） | ms | 最新値 |
+| `CPUms M` | 上記 `CPUms` の最大値 | ms | 起動後最大 |
+| `FRMms L` | 1フレームループ全体（描画 + swap待機）の時間 | ms | 最新値 |
+| `FRMms M` | 上記 `FRMms` の最大値 | ms | 起動後最大 |
+
+HUD の文字列更新は 8 フレームごとに間引き、描画オーバーヘッドを抑える。
+
+## 観測方法
+
+以下を実行して Layer 7 を起動する。
+
+```powershell
+cargo run --bin layer7_fullframe_dma --release
+```
+
+起動後に LCD 右上の `CPUms L/M` と `FRMms L/M` が更新されることを確認する。
+これにより、defmt の定期ログを見なくても描画負荷とフレーム周期を観測できる。
 
 ## 拡張フレームバッファ
 
@@ -210,8 +239,9 @@ DMA が 57,344 ワードを連続供給するため、FIFO アンダーランは
 ## 同期
 
 SM0 の DMA 転送 (57,344 ワード) と SM1 の DMA 転送 (225 ワード) は
-`embassy_futures::join::join` で同時開始する。SM1 の方が先に完了するが、
-`join` は両方の完了を待つため問題ない。
+DMA の `MULTI_CHAN_TRIGGER` に `0b11` を書き込み、完全同時に開始する。
+SM1 の方が先に完了するが、CH0 の `BUSY=false` を待つことで
+フレーム境界で両チャネル完了を保証できる。
 
 両 SM は `common.apply_sm_batch()` で同時に開始され、
 PIO クロック分周比で同期しているため、フレーム内の行単位同期は
