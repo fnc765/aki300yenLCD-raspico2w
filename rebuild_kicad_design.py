@@ -160,8 +160,8 @@ def absolute_visible_properties(block: str, x: float, y: float, rotation: float)
 # placed away from the wire carrying the component pins.
 FIELD_LAYOUTS: dict[str, dict[str, tuple[float, float, float]]] = {
     "U1": {"Reference": (179.07, 133.35, 0), "Value": (179.07, 199.39, 0)},
-    "J1": {"Reference": (238.76, 119.38, 0), "Value": (238.76, 218.44, 0)},
-    "J2": {"Reference": (139.70, 90.17, 0), "Value": (116.84, 113.03, 0)},
+    "J1": {"Reference": (316.88, 119.38, 0), "Value": (316.88, 220.98, 0)},
+    "J2": {"Reference": (139.70, 90.17, 0), "Value": (146.05, 105.41, 0)},
     "J3": {"Reference": (279.40, 148.59, 0), "Value": (279.40, 161.29, 0)},
     "U3": {"Reference": (168.91, 88.90, 0), "Value": (179.07, 116.84, 0)},
     "R7": {"Reference": (149.86, 77.47, 0), "Value": (149.86, 74.93, 0)},
@@ -174,7 +174,7 @@ FIELD_LAYOUTS: dict[str, dict[str, tuple[float, float, float]]] = {
     "R10": {"Reference": (202.00, 113.03, 0), "Value": (202.00, 118.11, 0)},
     "C8": {"Reference": (185.42, 91.44, 0), "Value": (185.42, 96.52, 0)},
     "R11": {"Reference": (230.00, 91.44, 0), "Value": (230.00, 96.52, 0)},
-    "D5": {"Reference": (230.00, 103.00, 0), "Value": (230.00, 109.22, 0)},
+    "D5": {"Reference": (230.00, 103.00, 0), "Value": (234.95, 108.00, 0)},
     "C9": {"Reference": (248.00, 92.71, 0), "Value": (248.00, 99.06, 0)},
     "D7": {"Reference": (260.35, 99.06, 0), "Value": (260.35, 96.52, 0)},
     "D6": {"Reference": (253.00, 111.76, 0), "Value": (253.00, 116.84, 0)},
@@ -616,7 +616,22 @@ def build_schematic() -> None:
 
     root: list[str] = []
     root.append(instance_from_old(old, "U1", "Custom:Pico_2W_40P", "Module:RaspberryPi_Pico_W_SMD_HandSolder", (grid(179.38), grid(168.42)), 0, "RaspberryPi_Pico_2W"))
-    root.append(instance_from_old(old, "J1", "Custom:LTA042B010F_FFC36", "Connector_FFC-FPC:TE_3-1734839-6_1x36-1MP_P0.5mm_Horizontal", (grid(239.38), grid(168.42)), 0, "LTA042B010F_FFC36"))
+    j1_position = (grid(317.50), grid(168.42))
+    old_j1_position = (grid(239.38), grid(168.42))
+    j1_delta = (j1_position[0] - old_j1_position[0], j1_position[1] - old_j1_position[1])
+    old_j1_pin_x = old_j1_position[0] - 7.62
+    new_j1_pin_x = j1_position[0] - 7.62
+
+    def j1_label_state(logical_x: float, logical_y: float) -> str | None:
+        if logical_y < 120:
+            return None
+        if abs(logical_x - old_j1_pin_x) <= 0.65:
+            return "old"
+        if abs(logical_x - new_j1_pin_x) <= 0.65:
+            return "new"
+        return None
+
+    root.append(instance_from_old(old, "J1", "Custom:LTA042B010F_FFC36", "Connector_FFC-FPC:TE_3-1734839-6_1x36-1MP_P0.5mm_Horizontal", j1_position, 0, "LTA042B010F_FFC36"))
 
     instances = [
         ("J2", "Connector_Generic:Conn_01x02", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", (139.70, 100.33), 0, "5V INPUT"),
@@ -651,8 +666,12 @@ def build_schematic() -> None:
             if at:
                 logical_x = at[0] - SHEET_OFFSET_X if source_is_reviewed else at[0]
                 logical_y = at[1] - SHEET_OFFSET_Y if source_is_reviewed else at[1]
-                if (160 <= logical_x <= 190 and logical_y >= 140) or (228 <= logical_x <= 234 and logical_y >= 120):
-                    root.append(translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block)
+            j1_state = j1_label_state(logical_x, logical_y)
+            if (160 <= logical_x <= 190 and logical_y >= 140) or j1_state:
+                translated = translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block
+                if j1_state == "old":
+                    translated = translate_sheet_block(translated, j1_delta[0], j1_delta[1])
+                root.append(translated)
         elif block.startswith("(label"):
             at = get_first_at(block)
             if not at:
@@ -660,8 +679,12 @@ def build_schematic() -> None:
             x, y, _ = at
             logical_x = x - SHEET_OFFSET_X if source_is_reviewed else x
             logical_y = y - SHEET_OFFSET_Y if source_is_reviewed else y
-            if (160 <= logical_x <= 190 and logical_y >= 140) or (228 <= logical_x <= 234 and logical_y >= 120):
-                root.append(translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block)
+            j1_state = j1_label_state(logical_x, logical_y)
+            if (160 <= logical_x <= 190 and logical_y >= 140) or j1_state:
+                translated = translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block
+                if j1_state == "old":
+                    translated = translate_sheet_block(translated, j1_delta[0], j1_delta[1])
+                root.append(translated)
 
     gnd_y, plus_y = 139.70, 82.55
     wires = [
