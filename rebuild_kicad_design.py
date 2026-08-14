@@ -150,6 +150,22 @@ def absolute_visible_properties(block: str, x: float, y: float, rotation: float)
     return block
 
 
+def properties_are_sheet_absolute(block: str) -> bool:
+    """Detect an already-reviewed instance so regeneration is idempotent."""
+    for property_name in ("Reference", "Value"):
+        property_start = block.find(f'(property "{property_name}"')
+        if property_start < 0:
+            continue
+        property_end = find_balanced(block, property_start)
+        property_block = block[property_start:property_end]
+        at_match = re.search(
+            r'\(at\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)', property_block
+        )
+        if at_match and (abs(float(at_match.group(1))) > 50 or abs(float(at_match.group(2))) > 50):
+            return True
+    return False
+
+
 def replace_lib_id(block: str, lib_id: str) -> str:
     return re.sub(r'\(lib_id "[^"]+"\)', f'(lib_id "{lib_id}")', block, count=1)
 
@@ -172,7 +188,8 @@ def instance_from_old(
     block = replace_property(block, "Footprint", footprint)
     if value is not None:
         block = replace_property(block, "Value", value)
-    block = absolute_visible_properties(block, position[0], position[1], rotation)
+    if not properties_are_sheet_absolute(block):
+        block = absolute_visible_properties(block, position[0], position[1], rotation)
     return block
 
 
@@ -195,6 +212,88 @@ def junction(x: float, y: float) -> str:
 \t\t(color 0 0 0 0)
 \t\t(uuid "{uid()}")
 \t)'''
+
+
+def parse_wire_segments(wire_blocks: list[str]) -> list[tuple[float, float, float, float]]:
+    segments: list[tuple[float, float, float, float]] = []
+    point_pattern = re.compile(r'\(xy\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\)')
+    for block in wire_blocks:
+        points = point_pattern.findall(block)
+        if len(points) != 2:
+            continue
+        (x1, y1), (x2, y2) = ((float(x), float(y)) for x, y in points)
+        if abs(x1 - x2) < 1e-9 and abs(y1 - y2) < 1e-9:
+            continue
+        segments.append((x1, y1, x2, y2))
+    return segments
+
+
+def point_on_segment_interior(
+    x: float,
+    y: float,
+    segment: tuple[float, float, float, float],
+    epsilon: float = 1e-6,
+) -> bool:
+    x1, y1, x2, y2 = segment
+    cross = (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1)
+    if abs(cross) > epsilon:
+        return False
+    if abs(x1 - x2) >= abs(y1 - y2):
+        return min(x1, x2) + epsilon < x < max(x1, x2) - epsilon and abs(y - y1) <= epsilon
+    return min(y1, y2) + epsilon < y < max(y1, y2) - epsilon and abs(x - x1) <= epsilon
+
+
+def junction_wire_profile(
+    x: float,
+    y: float,
+    segments: list[tuple[float, float, float, float]],
+    epsilon: float = 1e-6,
+) -> tuple[int, int]:
+    endpoints = 0
+    interiors = 0
+    for x1, y1, x2, y2 in segments:
+        at_endpoint = (abs(x - x1) <= epsilon and abs(y - y1) <= epsilon) or (
+            abs(x - x2) <= epsilon and abs(y - y2) <= epsilon
+        )
+        if at_endpoint:
+            endpoints += 1
+        elif point_on_segment_interior(x, y, (x1, y1, x2, y2), epsilon):
+            interiors += 1
+    return endpoints, interiors
+
+
+def junction_is_structurally_needed(endpoints: int, interiors: int) -> bool:
+    """Keep T/cross junctions and intentional terminal anchors."""
+    return (interiors >= 1 and (endpoints >= 1 or interiors >= 2)) or (endpoints == 1 and interiors == 0)
+
+
+def symbol_pin_local_points(symbol_block: str) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    for match in re.finditer(r'\(pin\s+', symbol_block):
+        pin_start = match.start()
+        pin_block = symbol_block[pin_start:find_balanced(symbol_block, pin_start)]
+        at = get_first_at(pin_block)
+        if at:
+            points.append((at[0], at[1]))
+    return points
+
+
+def collect_pin_endpoints(symbol_library: str, instances: list[str]) -> set[tuple[float, float]]:
+    endpoints: set[tuple[float, float]] = set()
+    for instance in instances:
+        lib_match = re.search(r'\(lib_id "([^"]+)"\)', instance)
+        at = get_first_at(instance)
+        if not lib_match or not at:
+            continue
+        try:
+            symbol_block = extract_symbol(symbol_library, lib_match.group(1))
+        except ValueError:
+            continue
+        x, y, rotation = at
+        for local_x, local_y in symbol_pin_local_points(symbol_block):
+            absolute = absolute_at(f"{local_x} {local_y} 0", x, y, rotation).split()
+            endpoints.add((round(float(absolute[0]), 6), round(float(absolute[1]), 6)))
+    return endpoints
 
 
 def label(name: str, x: float, y: float, rotation: float = 0) -> str:
@@ -418,6 +517,7 @@ def build_schematic() -> None:
     ]
     for ref, lib_id, footprint, position, rotation, value in instances:
         root.append(instance_from_old(old, ref, lib_id, footprint, position, rotation, value))
+    pin_endpoints = collect_pin_endpoints(new_lib, root)
 
     for block in objects:
         if block.startswith("(no_connect"):
@@ -487,6 +587,30 @@ def build_schematic() -> None:
         wire(118.11, gnd_y, 299.72, gnd_y),
     ]
     root.extend(wire_block for wire_block in wires if wire_block)
+    wire_segments = parse_wire_segments(wires)
+    seen_junctions: set[tuple[float, float]] = set()
+    kept_junctions: list[tuple[float, float]] = []
+    removed_junctions: list[tuple[float, float]] = []
+    four_way_junctions: list[tuple[float, float]] = []
+    candidate_count = 0
+
+    def add_junction_candidate(x: float, y: float) -> None:
+        nonlocal candidate_count
+        candidate_count += 1
+        coordinate = (round(x, 6), round(y, 6))
+        if coordinate in seen_junctions:
+            removed_junctions.append(coordinate)
+            return
+        seen_junctions.add(coordinate)
+        endpoints, interiors = junction_wire_profile(x, y, wire_segments)
+        if 2 * interiors + endpoints >= 4:
+            four_way_junctions.append(coordinate)
+        if coordinate in pin_endpoints or junction_is_structurally_needed(endpoints, interiors):
+            root.append(junction(x, y))
+            kept_junctions.append(coordinate)
+        else:
+            removed_junctions.append(coordinate)
+
     for x, y in [
         (127.00, 82.55), (130.81, 82.55), (127.00, 96.52), (127.00, 99.06),
         (127.00, 100.33), (130.81, 99.06), (130.81, 100.33), (118.11, 97.79),
@@ -505,7 +629,7 @@ def build_schematic() -> None:
         (266.70, 156.21), (266.70, gnd_y),
         (130.81, 82.55), (125.73, gnd_y), (196.85, 82.55), (285.75, 104.14),
     ]:
-        root.append(junction(x, y))
+        add_junction_candidate(x, y)
     for x, y in [
         (146.05, 82.55), (153.67, 82.55), (160.02, 82.55), (167.64, 82.55),
         (176.53, 82.55), (299.72, 82.55), (190.50, 90.17), (208.28, 90.17),
@@ -519,7 +643,25 @@ def build_schematic() -> None:
         (208.28, 119.38), (299.72, 130.81), (144.78, 139.70), (274.32, 151.13),
         (274.32, 153.67), (287.02, 180.34), (134.62, 102.87), (130.81, 102.87),
     ]:
-        root.append(junction(x, y))
+        add_junction_candidate(x, y)
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    report = [
+        "KiCad schematic junction cleanup report",
+        f"candidate entries: {candidate_count}",
+        f"unique coordinates: {len(seen_junctions)}",
+        f"kept structural/terminal junctions: {len(kept_junctions)}",
+        f"removed duplicate/endpoint/collinear junctions: {len(removed_junctions)}",
+        f"four-way junctions retained for review: {len(four_way_junctions)}",
+        "",
+        "Rule: retain T/cross junctions, symbol pin endpoints, and terminal anchors.",
+        "No dangling wires or labels are deleted by this cleanup.",
+        "",
+        "Retained four-way coordinates:",
+        *(f"  {x:.3f}, {y:.3f}" for x, y in four_way_junctions),
+    ]
+    (OUT / "pico_lta042b010f_carrier-junction-cleanup.txt").write_text("\n".join(report) + "\n", encoding="utf-8")
+
     root.extend([
         # Power labels are kept only at the rails and off-board interfaces;
         # the component-to-component nets are visibly wired.

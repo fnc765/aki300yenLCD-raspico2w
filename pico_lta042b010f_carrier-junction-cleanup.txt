@@ -1,0 +1,13 @@
+KiCad schematic junction cleanup report
+candidate entries: 106
+unique coordinates: 105
+kept structural/terminal junctions: 73
+removed duplicate/endpoint/collinear junctions: 33
+four-way junctions retained for review: 2
+
+Rule: retain T/cross junctions, symbol pin endpoints, and terminal anchors.
+No dangling wires or labels are deleted by this cleanup.
+
+Retained four-way coordinates:
+  130.810, 100.330
+  156.210, 96.520
