@@ -278,6 +278,46 @@ def wire(x1: float, y1: float, x2: float, y2: float) -> str:
 \t)'''
 
 
+def bus(x1: float, y1: float, x2: float, y2: float) -> str:
+    if abs(x1 - x2) < 1e-9 and abs(y1 - y2) < 1e-9:
+        return ""
+    return f'''\t(bus
+\t\t(pts
+\t\t\t(xy {fmt(x1)} {fmt(y1)}) (xy {fmt(x2)} {fmt(y2)})
+\t\t)
+\t\t(stroke (width 0) (type default))
+\t\t(uuid "{uid()}")
+\t)'''
+
+
+def bus_entry(x: float, y: float, size_x: float, size_y: float) -> str:
+    return f'''\t(bus_entry
+\t\t(at {fmt(x)} {fmt(y)})
+\t\t(size {fmt(size_x)} {fmt(size_y)})
+\t\t(stroke (width 0) (type default))
+\t\t(uuid "{uid()}")
+\t)'''
+
+
+def visible_label(
+    name: str,
+    x: float,
+    y: float,
+    rotation: float = 0,
+    size: float = 0.9,
+) -> str:
+    justify = "right bottom" if abs(rotation - 180) < 1e-9 else "left bottom"
+    return f'''\t(label "{name}"
+\t\t(at {fmt(x)} {fmt(y)} {fmt(rotation)})
+\t\t(effects (font (size {fmt(size)} {fmt(size)})) (justify {justify}))
+\t\t(uuid "{uid()}")
+\t)'''
+
+
+def bus_label(name: str, x: float, y: float, rotation: float = 0) -> str:
+    return visible_label(name, x, y, rotation, size=0.9)
+
+
 def translate_sheet_block(block: str, dx: float, dy: float) -> str:
     """Translate plotted sheet coordinates while leaving local fields at 0,0."""
     pattern = re.compile(
@@ -633,6 +673,13 @@ def build_schematic() -> None:
 
     root.append(instance_from_old(old, "J1", "Custom:LTA042B010F_FFC36", "Connector_FFC-FPC:TE_3-1734839-6_1x36-1MP_P0.5mm_Horizontal", j1_position, 0, "LTA042B010F_FFC36"))
 
+    lcd_signal_names = {
+        *(f"LCD_R{index}" for index in range(6)),
+        *(f"LCD_G{index}" for index in range(6)),
+        *(f"LCD_B{index}" for index in range(6)),
+        "LCD_NCLK", "LCD_HSYNC", "LCD_VSYNC",
+    }
+
     instances = [
         ("J2", "Connector_Generic:Conn_01x02", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", (139.70, 100.33), 0, "5V INPUT"),
         ("J3", "Connector_Generic:Conn_01x02", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", (279.40, 153.67), 0, "13V8 OUT"),
@@ -663,9 +710,10 @@ def build_schematic() -> None:
     for block in objects:
         if block.startswith("(no_connect"):
             at = get_first_at(block)
-            if at:
-                logical_x = at[0] - SHEET_OFFSET_X if source_is_reviewed else at[0]
-                logical_y = at[1] - SHEET_OFFSET_Y if source_is_reviewed else at[1]
+            if not at:
+                continue
+            logical_x = at[0] - SHEET_OFFSET_X if source_is_reviewed else at[0]
+            logical_y = at[1] - SHEET_OFFSET_Y if source_is_reviewed else at[1]
             j1_state = j1_label_state(logical_x, logical_y)
             if (160 <= logical_x <= 190 and logical_y >= 140) or j1_state:
                 translated = translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block
@@ -681,10 +729,171 @@ def build_schematic() -> None:
             logical_y = y - SHEET_OFFSET_Y if source_is_reviewed else y
             j1_state = j1_label_state(logical_x, logical_y)
             if (160 <= logical_x <= 190 and logical_y >= 140) or j1_state:
+                signal_match = re.match(r'\(label "([^"]+)"', block)
+                if signal_match and (
+                    signal_match.group(1) in lcd_signal_names
+                    or signal_match.group(1).startswith("LCD_")
+                ):
+                    # The legacy drawing put every LCD signal label directly
+                    # on a symbol pin.  Those labels are rebuilt below as
+                    # short wires into native bus entries.
+                    continue
                 translated = translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block
                 if j1_state == "old":
                     translated = translate_sheet_block(translated, j1_delta[0], j1_delta[1])
                 root.append(translated)
+
+    def logical_point(x: float, y: float) -> tuple[float, float]:
+        return grid(x - SHEET_OFFSET_X), grid(y - SHEET_OFFSET_Y)
+
+    def add_bus_bundle(
+        blocks: list[str],
+        name: str,
+        pin_x: float,
+        signals: list[tuple[str, float]],
+        bus_x: float,
+        side: str,
+    ) -> None:
+        """Add a local vertical RGB bus fan-out without changing net names.
+
+        KiCad buses are visual grouping objects. Each member still needs a
+        real wire and a member label, so hidden member labels are placed at
+        the wire ends while the visible bus label communicates the group.
+        The three RGB buses are kept as separate local corridors next to the
+        Pico/LCD symbols; this avoids crossing the power block or title block
+        on the single A4 sheet.
+        """
+        if not signals:
+            return
+        logical_pin_x, _ = logical_point(pin_x, signals[0][1])
+        signal_points = [
+            (signal, logical_point(pin_x, y)[1]) for signal, y in signals
+        ]
+        logical_bus_x, _ = logical_point(bus_x, signals[0][1])
+        if side == "left":
+            entry_x = bus_x + 2.54
+            label_rotation = 180
+            label_end_x = bus_x - 7.62
+            entry_size = (-2.54, -2.54)
+        elif side == "right":
+            entry_x = bus_x - 2.54
+            label_rotation = 0
+            label_end_x = bus_x + 7.62
+            entry_size = (2.54, -2.54)
+        else:
+            raise ValueError(f"unsupported bus side: {side}")
+        logical_entry_x, _ = logical_point(entry_x, signals[0][1])
+        logical_label_end_x, _ = logical_point(label_end_x, signals[0][1])
+        ys = [y for _, y in signal_points]
+        bus_y_start = min(ys) - 2.54
+        bus_y_end = max(ys) - 2.54
+        blocks.append(bus(logical_bus_x, bus_y_start, logical_bus_x, bus_y_end))
+        blocks.append(
+            bus(logical_bus_x, bus_y_end, logical_label_end_x, bus_y_end)
+        )
+        blocks.append(bus_label(name, logical_bus_x, bus_y_end, label_rotation))
+        for signal, y in signal_points:
+            blocks.append(wire(logical_pin_x, y, logical_entry_x, y))
+            blocks.append(
+                bus_entry(logical_entry_x, y, entry_size[0], entry_size[1])
+            )
+            blocks.append(hidden_label(signal, logical_entry_x, y, label_rotation))
+
+    # Coordinates below are the visible coordinates from the reviewed A4
+    # schematic. They are converted back to the generator's pre-page-offset
+    # coordinate system by logical_point().
+    lcd_signal_blocks: list[str] = []
+    u1_left_bundles = [
+        (
+            "LCD_R[0..5]",
+            110.49,
+            [("LCD_R0", 101.60), ("LCD_R3", 106.68), ("LCD_R5", 109.22)],
+            99.06,
+        ),
+        (
+            "LCD_G[0..5]",
+            110.49,
+            [("LCD_G0", 111.76), ("LCD_G2", 114.30), ("LCD_G5", 119.38)],
+            96.52,
+        ),
+        (
+            "LCD_B[0..5]",
+            110.49,
+            [("LCD_B1", 121.92), ("LCD_B2", 124.46), ("LCD_B4", 127.00)],
+            93.98,
+        ),
+    ]
+    u1_right_bundles = [
+        (
+            "LCD_R[0..5]",
+            125.73,
+            [("LCD_R1", 104.14), ("LCD_R2", 106.68), ("LCD_R4", 109.22)],
+            135.89,
+        ),
+        (
+            "LCD_G[0..5]",
+            125.73,
+            [("LCD_G1", 114.30), ("LCD_G3", 116.84), ("LCD_G4", 119.38)],
+            140.97,
+        ),
+        (
+            "LCD_B[0..5]",
+            125.73,
+            [("LCD_B0", 121.92), ("LCD_B3", 127.00), ("LCD_B5", 129.54)],
+            146.05,
+        ),
+    ]
+    j1_bundles = [
+        (
+            "LCD_R[0..5]",
+            248.92,
+            [(f"LCD_R{index}", 86.36 + index * 2.54) for index in range(6)],
+            241.30,
+        ),
+        (
+            "LCD_G[0..5]",
+            248.92,
+            [(f"LCD_G{index}", 104.14 + index * 2.54) for index in range(6)],
+            238.76,
+        ),
+        (
+            "LCD_B[0..5]",
+            248.92,
+            [(f"LCD_B{index}", 121.92 + index * 2.54) for index in range(6)],
+            236.22,
+        ),
+    ]
+    for name, pin_x, signals, bus_x in u1_left_bundles:
+        add_bus_bundle(lcd_signal_blocks, name, pin_x, signals, bus_x, "left")
+    for name, pin_x, signals, bus_x in u1_right_bundles:
+        add_bus_bundle(lcd_signal_blocks, name, pin_x, signals, bus_x, "right")
+    for name, pin_x, signals, bus_x in j1_bundles:
+        add_bus_bundle(lcd_signal_blocks, name, pin_x, signals, bus_x, "left")
+
+    def add_control_stub(
+        pin_x: float,
+        pin_y: float,
+        wire_x: float,
+        name: str,
+        side: str,
+    ) -> None:
+        logical_pin_x, logical_y = logical_point(pin_x, pin_y)
+        logical_wire_x, _ = logical_point(wire_x, pin_y)
+        rotation = 180 if side == "left" else 0
+        lcd_signal_blocks.extend(
+            [
+                wire(logical_pin_x, logical_y, logical_wire_x, logical_y),
+                hidden_label(name, logical_wire_x, logical_y, rotation),
+                visible_label(name, logical_wire_x, logical_y, rotation, size=0.8),
+            ]
+        )
+
+    for pin_y, name in [(96.52, "LCD_VSYNC"), (99.06, "LCD_HSYNC")]:
+        add_control_stub(110.49, pin_y, 102.87, name, "left")
+    add_control_stub(125.73, 101.60, 133.35, "LCD_NCLK", "right")
+    for pin_y, name in [(142.24, "LCD_VSYNC"), (144.78, "LCD_HSYNC"), (149.86, "LCD_NCLK")]:
+        add_control_stub(248.92, pin_y, 238.76, name, "left")
+    root.extend(block for block in lcd_signal_blocks if block)
 
     gnd_y, plus_y = 139.70, 82.55
     wires = [
