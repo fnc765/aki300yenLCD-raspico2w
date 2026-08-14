@@ -41,22 +41,25 @@ Picoのフットプリントは、Raspberry Pi公式資料のPico W/Pico 2 W共�
 
 ## 回路図の接続点整理
 
-- 整理前106個から、重複・直線上の不要点を整理し、最終71個に整理
-- T字分岐、交差接続、シンボルのピン端点、ERC上必要な終端アンカーは保持
-- 4方向接続は2箇所を残し、レビュー対象としてレポート化
-- 整理前後でネット定義44件、ピン接続の変更0、ERCエラー／警告0を確認
-- 信号配線は保持し、明らかに余っていた+13Vレール末端だけを短縮
+- 候補107件を検査し、重複・直線上の不要点を除去して構造的なワイヤ同士の分岐19件だけを保持
+- 部品ピン端子上の接続点は0件。ピンへはワイヤ端点を正確に合わせ、接続点はワイヤ同士のT字・十字分岐に限定
+- 4方向接続は0件。J2/C6/RV1のGNDは端子側ではなくGNDレール側または下側のラベルで接続
+- 変更前後でネット定義44件、`(nets ...)`のピン集合一致、ERCエラー／警告0を確認
+- 完全重複・同一直線上の部分重複ワイヤは0件。J2/R8/U3周辺の冗長な折返し・部品本体を横切る配線を除去
 
 ## 回路図の視覚整理
 
 - 部品のReference／Valueを部品の回転とは独立して水平配置し、配線上から移動
 - R7、L1、D4、R9、R11、D5、D6、D7、C11、D8など、縦向き・上下反転・隣接文字の重なりを修正
+- J2はピン1を上側の+5V、ピン2を下側のGNDへ整理し、C6を左下へ配置
+- R8のDC線はU3上側を迂回し、IPK検出線は+5V Vin線と同じ高さを共有せずU3右側へ迂回
+- R9/R10のフィードバック配線は部分重複をなくし、RV1のGNDは+3V3枝を横切らず下側ラベルへ接続
 - J2周辺、MC34063周辺、RV1の+3V3表示を整理し、短い明示配線で確認できる状態に変更
 - 電源フラグのシンボルは保持しつつ、`PWR_FLAG` の冗長な文字列を非表示にし、電源ネット名との重なりを解消
 - +13V8上側レールの明らかに余った末端配線を削除し、実際の分岐位置で終端
 - 回路図をA3からA4横向きへ変更し、回路本体を拡大してタイトルブロックとの干渉を解消
 - 内部接続補助ラベルは電気的接続を保持するため残していますが、通常の画像表示では読めない極小サイズです
-- KiCad純正PDFは1ページ、整理後ERCはエラー0／警告0、ネットリスト差分は0です
+- KiCad純正PDFは1ページ、整理後ERCはエラー0／警告0、ネットリストの`(nets ...)`差分は0です
 
 U3は、SwEをGNDへ意図的に接続するこの回路でERCを成立させるため、埋め込み記号の該当ピンをpassiveとして扱っています。そのためプロジェクトでは、この意図的な記号差分だけ`lib_symbol_mismatch`を無視しています。実機のMC34063AD品種とデータシートを再確認してください。
 
@@ -76,6 +79,8 @@ PCB Editorで **Update PCB from Schematic (F8)** を実行し、現物に合わ�
 - [Raspberry Pi Pico 2 W公式データシート](https://datasheets.raspberrypi.com/picow/pico-2-w-datasheet.pdf)
 - [KiCad公式フットプリントライブラリ](https://gitlab.com/kicad/libraries/kicad-footprints/)
 - [KiCad公式Pico W SMD手はんだフットプリント](https://gitlab.com/kicad/libraries/kicad-footprints/-/blob/master/Module.pretty/RaspberryPi_Pico_W_SMD_HandSolder.kicad_mod?ref_type=heads)
+- [KiCad 9回路図エディターマニュアル](https://docs.kicad.org/9.0/ja/eeschema/eeschema.html)
+- [KiCad 9 CLIマニュアル](https://docs.kicad.org/9.0/en/cli/cli.html)
 - [onsemi MC34063A公式データシート](https://www.onsemi.com/download/data-sheet/pdf/mc34063a-d.pdf)
 - [Diodes Incorporated 1N5819公式ページ](https://www.diodes.com/part/view/1N5819)
 - [pol: ESP32-S3で秋月300円液晶を動かす](https://pol.hateblo.jp/entry/2023/11/27/001524)

@@ -1,14 +1,15 @@
 KiCad schematic junction cleanup report
-candidate entries: 105
-unique coordinates: 104
-kept structural/terminal junctions: 71
-removed duplicate/endpoint/collinear junctions: 34
-four-way junctions retained for review: 2
+candidate entries: 107
+unique coordinates: 103
+kept structural/terminal junctions: 19
+removed duplicate/endpoint/collinear junctions: 88
+four-way junctions retained for review: 0
+component-pin endpoint junctions kept: 0
 
-Rule: retain T/cross junctions, symbol pin endpoints, and terminal anchors.
-Signal wiring is preserved; only the visually dangling +13V rail extension is shortened.
-Internal helper labels remain electrically present at sub-pixel size for legacy pin endpoints.
+Rule: retain wire-wire T/cross branches; do not place dots on component pin endpoints.
+Signal wiring is preserved while redundant J2/R8/R9 routing is removed and U3/C8 are not crossed.
+J2 pin 1 is the upper +5V input; pin 2 drops to the lower GND rail.
+IPK sense is routed through a separate upper/right corridor instead of sharing the +5V Vin line.
+Internal helper labels remain electrically present at sub-pixel size only where direct wiring is not yet practical.
 
 Retained four-way coordinates:
-  69.850, 39.370
-  95.250, 35.560

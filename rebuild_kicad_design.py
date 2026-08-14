@@ -161,14 +161,14 @@ def absolute_visible_properties(block: str, x: float, y: float, rotation: float)
 FIELD_LAYOUTS: dict[str, dict[str, tuple[float, float, float]]] = {
     "U1": {"Reference": (179.07, 133.35, 0), "Value": (179.07, 199.39, 0)},
     "J1": {"Reference": (238.76, 119.38, 0), "Value": (238.76, 218.44, 0)},
-    "J2": {"Reference": (139.70, 90.17, 0), "Value": (130.81, 106.68, 0)},
+    "J2": {"Reference": (139.70, 90.17, 0), "Value": (116.84, 113.03, 0)},
     "J3": {"Reference": (279.40, 148.59, 0), "Value": (279.40, 161.29, 0)},
     "U3": {"Reference": (168.91, 88.90, 0), "Value": (179.07, 116.84, 0)},
     "R7": {"Reference": (149.86, 77.47, 0), "Value": (149.86, 74.93, 0)},
     "L1": {"Reference": (163.83, 77.47, 0), "Value": (163.83, 74.93, 0)},
     "D4": {"Reference": (180.34, 77.47, 0), "Value": (180.34, 74.93, 0)},
-    "R8": {"Reference": (142.24, 93.98, 0), "Value": (149.86, 91.44, 0)},
-    "C6": {"Reference": (151.00, 102.87, 0), "Value": (151.00, 109.22, 0)},
+    "R8": {"Reference": (149.86, 95.25, 0), "Value": (149.86, 92.71, 0)},
+    "C6": {"Reference": (124.46, 105.41, 0), "Value": (130.81, 113.03, 0)},
     "C7": {"Reference": (154.94, 112.00, 0), "Value": (154.94, 116.00, 0)},
     "R9": {"Reference": (214.63, 91.44, 0), "Value": (214.63, 96.52, 0)},
     "R10": {"Reference": (202.00, 113.03, 0), "Value": (202.00, 118.11, 0)},
@@ -181,7 +181,7 @@ FIELD_LAYOUTS: dict[str, dict[str, tuple[float, float, float]]] = {
     "C11": {"Reference": (271.78, 111.76, 0), "Value": (271.78, 116.84, 0)},
     "D8": {"Reference": (292.00, 111.76, 0), "Value": (292.00, 116.84, 0)},
     "R16": {"Reference": (292.00, 123.19, 0), "Value": (292.00, 130.81, 0)},
-    "RV1": {"Reference": (287.02, 173.99, 0), "Value": (279.40, 190.50, 0)},
+    "RV1": {"Reference": (287.02, 173.99, 0), "Value": (279.40, 195.58, 0)},
 }
 
 
@@ -357,9 +357,13 @@ def junction_wire_profile(
     return endpoints, interiors
 
 
-def junction_is_structurally_needed(endpoints: int, interiors: int) -> bool:
-    """Keep T/cross junctions and intentional terminal anchors."""
-    return (interiors >= 1 and (endpoints >= 1 or interiors >= 2)) or (endpoints == 1 and interiors == 0)
+def junction_is_structurally_needed(
+    endpoints: int, interiors: int, pin_endpoint: bool = False
+) -> bool:
+    """Keep wire-wire branches, never a dot that only terminates at a pin."""
+    if pin_endpoint:
+        return False
+    return interiors >= 1 and (endpoints >= 1 or interiors >= 2)
 
 
 def symbol_pin_local_points(symbol_block: str) -> list[tuple[float, float]]:
@@ -371,6 +375,21 @@ def symbol_pin_local_points(symbol_block: str) -> list[tuple[float, float]]:
         if at:
             points.append((at[0], at[1]))
     return points
+
+
+def absolute_pin_at(
+    local_x: float, local_y: float, x: float, y: float, rotation: float
+) -> tuple[float, float]:
+    """Convert KiCad symbol-local pin coordinates to sheet coordinates.
+
+    Symbol libraries use a y-up local coordinate system while schematic sheet
+    coordinates are y-down.  This is intentionally separate from
+    ``absolute_at``, which is used for property text positions.
+    """
+    radians = math.radians(rotation)
+    absolute_x = x + local_x * math.cos(radians) - local_y * math.sin(radians)
+    absolute_y = y - (local_x * math.sin(radians) + local_y * math.cos(radians))
+    return absolute_x, absolute_y
 
 
 def collect_pin_endpoints(symbol_library: str, instances: list[str]) -> set[tuple[float, float]]:
@@ -386,8 +405,10 @@ def collect_pin_endpoints(symbol_library: str, instances: list[str]) -> set[tupl
             continue
         x, y, rotation = at
         for local_x, local_y in symbol_pin_local_points(symbol_block):
-            absolute = absolute_at(f"{local_x} {local_y} 0", x, y, rotation).split()
-            endpoints.add((round(float(absolute[0]), 6), round(float(absolute[1]), 6)))
+            absolute_x, absolute_y = absolute_pin_at(
+                local_x, local_y, x, y, rotation
+            )
+            endpoints.add((round(absolute_x, 6), round(absolute_y, 6)))
     return endpoints
 
 
@@ -604,8 +625,8 @@ def build_schematic() -> None:
         ("R7", "Device:R", "Resistor_SMD:R_2512_6332Metric_Pad1.40x3.35mm_HandSolder", (149.86, 82.55), 270, "0.47R 1%"),
         ("L1", "Device:L", "Inductor_SMD:L_Sunlord_MWSA1204S-150", (163.83, 82.55), 270, "150uH"),
         ("D4", "Device:D_Schottky", "Diode_SMD:D_SMA", (180.34, 82.55), 180, "1N5819"),
-        ("R8", "Device:R", "Resistor_SMD:R_0805_2012Metric", (142.24, 99.06), 90, "200"),
-        ("C6", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (144.78, 105.41), 0, "220u 16V"),
+        ("R8", "Device:R", "Resistor_SMD:R_0805_2012Metric", (149.86, 99.06), 90, "200"),
+        ("C6", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (130.81, 105.41), 0, "220u 16V"),
         ("C7", "Device:C", "Capacitor_SMD:C_0805_2012Metric", (149.86, 115.57), 0, "470p"),
         ("R9", "Device:R", "Resistor_SMD:R_0805_2012Metric", (208.28, 93.98), 0, "10k 1%"),
         ("R10", "Device:R", "Resistor_SMD:R_0805_2012Metric", (208.28, 115.57), 0, "1k 1%"),
@@ -644,24 +665,32 @@ def build_schematic() -> None:
 
     gnd_y, plus_y = 139.70, 82.55
     wires = [
-        # J2 +5, GND and input-to-R7 path
+        # J2 +5 and GND.  Keep pin 1 on the upper input rail and route
+        # pin 2 directly downward; never run a wire through the connector body.
         wire(134.62, 100.33, 130.81, 100.33), wire(130.81, 100.33, 127.00, 100.33),
         wire(127.00, 100.33, 127.00, 82.55), wire(127.00, 82.55, 146.05, 82.55),
-        wire(134.62, 97.79, 130.81, 97.79), wire(130.81, 97.79, 118.11, 97.79),
-        wire(118.11, 97.79, 118.11, gnd_y),
+        wire(134.62, 102.87, 134.62, gnd_y),
 
         # +5 bus to U3 Vin; R8 driver resistor; C6
         wire(127.00, 96.52, 154.94, 96.52), wire(158.75, 96.52, 154.94, 96.52),
-        wire(134.62, 99.06, 130.81, 99.06), wire(130.81, 99.06, 130.81, 100.33),
-        wire(138.43, 99.06, 130.81, 99.06),
-        wire(146.05, 99.06, 175.26, 99.06), wire(179.07, 99.06, 175.26, 99.06),
-        wire(144.78, 101.60, 144.78, 100.33), wire(127.00, 100.33, 144.78, 100.33),
-        wire(144.78, 109.22, 144.78, gnd_y),
+        # R8 pin 1 joins the +5 bus with one short branch.  Its pin 2 path
+        # leaves U3 to the left and loops above the symbol, never through it.
+        wire(146.05, 99.06, 146.05, 96.52),
+        wire(153.67, 99.06, 153.67, 91.44),
+        wire(153.67, 91.44, 187.96, 91.44),
+        wire(187.96, 91.44, 187.96, 99.06),
+        wire(187.96, 99.06, 179.07, 99.06),
+        # C6 is placed below/left of J2 so its +5 pin is reached from the
+        # input rail without crossing the connector body.
+        wire(130.81, 101.60, 130.81, 100.33),
+        wire(130.81, 109.22, 130.81, gnd_y),
 
-        # R7/L1 current path, IPK sense
+        # R7/L1 current path, IPK sense.  Route the sense line above and to
+        # the right of U3; do not share the +5V Vin corridor or cross C8.
         wire(153.67, 82.55, 160.02, 82.55), wire(167.64, 82.55, 176.53, 82.55),
-        wire(156.21, 82.55, 156.21, 96.52), wire(156.21, 96.52, 181.61, 96.52),
-        wire(179.07, 96.52, 181.61, 96.52),
+        wire(156.21, 82.55, 156.21, 88.90), wire(156.21, 88.90, 194.31, 88.90),
+        wire(194.31, 88.90, 194.31, 100.33), wire(194.31, 100.33, 181.61, 100.33),
+        wire(181.61, 100.33, 181.61, 96.52), wire(181.61, 96.52, 179.07, 96.52),
 
         # U3 TC, GND, switch emitter
         wire(149.86, 111.76, 149.86, 106.68), wire(154.94, 106.68, 149.86, 106.68),
@@ -673,7 +702,7 @@ def build_schematic() -> None:
         # U3 VFB and feedback divider
         wire(179.07, 109.22, 182.88, 109.22), wire(182.88, 109.22, 195.58, 109.22),
         wire(195.58, 109.22, 195.58, 116.84), wire(195.58, 116.84, 208.28, 116.84),
-        wire(208.28, 97.79, 208.28, 116.84), wire(208.28, 111.76, 208.28, 116.84),
+        wire(208.28, 97.79, 208.28, 111.76), wire(208.28, 111.76, 208.28, 116.84),
         wire(208.28, 119.38, 208.28, gnd_y),
 
         # +13 rail and positive LED. Stop the rail at the last actual branch;
@@ -695,8 +724,10 @@ def build_schematic() -> None:
         wire(274.32, 153.67, 270.51, 153.67),
         wire(274.32, 156.21, 266.70, 156.21), wire(266.70, 156.21, 266.70, gnd_y),
         wire(279.40, 168.91, 279.40, 176.53),
+        # RV1 pin 3 is below the +3V3 branch.  Terminate it at a local GND
+        # symbol below the pot instead of routing upward through +3V3.
         wire(279.40, 184.15, 279.40, 190.50), wire(283.21, 180.34, 287.02, 180.34),
-        wire(118.11, gnd_y, 299.72, gnd_y),
+        wire(125.73, gnd_y, 299.72, gnd_y),
     ]
     root.extend(wire_block for wire_block in wires if wire_block)
     wire_segments = parse_wire_segments(wires)
@@ -717,7 +748,9 @@ def build_schematic() -> None:
         endpoints, interiors = junction_wire_profile(x, y, wire_segments)
         if 2 * interiors + endpoints >= 4:
             four_way_junctions.append(coordinate)
-        if coordinate in pin_endpoints or junction_is_structurally_needed(endpoints, interiors):
+        if junction_is_structurally_needed(
+            endpoints, interiors, coordinate in pin_endpoints
+        ):
             root.append(junction(x, y))
             kept_junctions.append(coordinate)
         else:
@@ -725,10 +758,12 @@ def build_schematic() -> None:
 
     for x, y in [
         (127.00, 82.55), (130.81, 82.55), (127.00, 96.52), (127.00, 99.06),
-        (127.00, 100.33), (130.81, 99.06), (130.81, 100.33), (118.11, 97.79),
-        (118.11, gnd_y), (134.62, 100.33), (134.62, 97.79), (144.78, 100.33),
-        (144.78, 96.52), (138.43, 99.06), (156.21, 82.55), (156.21, 96.52),
-        (181.61, 96.52), (154.94, 106.68), (149.86, 106.68), (149.86, gnd_y),
+        (127.00, 100.33), (130.81, 100.33), (125.73, gnd_y),
+        (130.81, gnd_y), (134.62, gnd_y),
+        (134.62, 100.33), (134.62, 102.87), (130.81, 101.60),
+        (146.05, 96.52), (146.05, 99.06), (156.21, 82.55), (156.21, 88.90),
+        (181.61, 96.52), (181.61, 100.33), (194.31, 100.33),
+        (154.94, 106.68), (149.86, 106.68), (149.86, gnd_y),
         (168.91, 118.11), (168.91, gnd_y), (182.88, 106.68), (187.96, 106.68),
         (187.96, gnd_y), (182.88, 109.22), (195.58, 109.22), (195.58, 116.84),
         (208.28, 116.84), (208.28, gnd_y), (184.15, 82.55), (190.50, 82.55),
@@ -737,7 +772,7 @@ def build_schematic() -> None:
         (247.65, gnd_y), (256.54, 104.14), (264.16, 104.14), (278.13, 104.14),
         (278.13, gnd_y), (299.72, 104.14), (299.72, 110.49), (299.72, 118.11),
         (299.72, 123.19), (299.72, gnd_y), (270.51, 153.67), (270.51, 151.13),
-        (279.40, 176.53), (279.40, 190.50), (279.40, 184.15), (283.21, 180.34),
+        (279.40, 176.53), (279.40, 184.15), (279.40, 190.50), (283.21, 180.34),
         (266.70, 156.21), (266.70, gnd_y),
         (130.81, 82.55), (125.73, gnd_y), (196.85, 82.55), (285.75, 104.14),
     ]:
@@ -765,10 +800,13 @@ def build_schematic() -> None:
         f"kept structural/terminal junctions: {len(kept_junctions)}",
         f"removed duplicate/endpoint/collinear junctions: {len(removed_junctions)}",
         f"four-way junctions retained for review: {len(four_way_junctions)}",
+        f"component-pin endpoint junctions kept: {sum(coordinate in pin_endpoints for coordinate in kept_junctions)}",
         "",
-        "Rule: retain T/cross junctions, symbol pin endpoints, and terminal anchors.",
-        "Signal wiring is preserved; only the visually dangling +13V rail extension is shortened.",
-        "Internal helper labels remain electrically present at sub-pixel size for legacy pin endpoints.",
+        "Rule: retain wire-wire T/cross branches; do not place dots on component pin endpoints.",
+        "Signal wiring is preserved while redundant J2/R8/R9 routing is removed and U3/C8 are not crossed.",
+        "J2 pin 1 is the upper +5V input; pin 2 drops to the lower GND rail.",
+        "IPK sense is routed through a separate upper/right corridor instead of sharing the +5V Vin line.",
+        "Internal helper labels remain electrically present at sub-pixel size only where direct wiring is not yet practical.",
         "",
         "Retained four-way coordinates:",
         *(
@@ -781,12 +819,11 @@ def build_schematic() -> None:
     root.extend([
         # Power labels are kept only at the rails and off-board interfaces;
         # the component-to-component nets are visibly wired.
-        hidden_label("+5V", 127.00, 82.55), hidden_label("GND", 118.11, gnd_y),
-        hidden_label("IPK_SENSE", 179.07, 96.52), hidden_label("DRIVER_DC", 160.02, 99.06),
+        hidden_label("+5V", 127.00, 82.55),
+        hidden_label("IPK_SENSE", 179.07, 96.52),
         hidden_label("TC_TIMING", 149.86, 106.68), hidden_label("+13V8", 190.50, 82.55),
         hidden_label("VFB", 195.58, 116.84), hidden_label("PWR_LED_P", 224.79, 102.87),
         hidden_label("CPUMP_MID", 242.57, 104.14), hidden_label("NEG_LED_N", 299.72, 123.19),
-        hidden_label("GND", 134.62, 102.87), hidden_label("GND", 144.78, 109.22),
         hidden_label("+5V", 158.75, 96.52), hidden_label("IPK_SENSE", 153.67, 82.55),
         hidden_label("IPK_SENSE", 160.02, 82.55), hidden_label("SW_NODE", 167.64, 82.55),
         hidden_label("+13V8", 184.15, 82.55), hidden_label("GND", 168.91, 114.30),
@@ -797,8 +834,12 @@ def build_schematic() -> None:
         hidden_label("CPUMP_MID", 247.65, 110.49), hidden_label("GND", 247.65, 118.11),
         hidden_label("-13V8", 264.16, 104.14), hidden_label("-13V8", 278.13, 110.49),
         hidden_label("GND", 278.13, 118.11), hidden_label("GND", 274.32, 156.21),
-        hidden_label("GND", 279.40, 184.15), hidden_label("+5V", 130.81, 82.55),
+        hidden_label("GND", 279.40, 184.15), hidden_label("DRIVER_DC", 153.67, 99.06),
+        hidden_label("GND", 134.62, 102.87),
+        hidden_label("GND", 130.81, 109.22), hidden_label("+5V", 146.05, 99.06),
+        hidden_label("GND", 299.72, 130.81), hidden_label("+5V", 130.81, 82.55),
         label("+3V3", 279.40, 168.91), label("GND", 125.73, gnd_y),
+        label("GND", 279.40, 190.50),
         label("+13V8", 196.85, plus_y, 180),
         label("-13V8", 285.75, 104.14, 180), hidden_label("SW_NODE", 176.53, 82.55, 180),
         hidden_label("SW_NODE", 179.07, 101.60), label("+13V8", 270.51, 153.67),
