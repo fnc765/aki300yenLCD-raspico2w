@@ -295,11 +295,12 @@ DMA Channel 1:
   ┌────────────────────────┼────────────────────────┐
   │                        │                        │
   ▼                        ▼                        ▼
-LCD Pin 3,7,14,         ±12V DC-DC              LCD GND
-30,32,34,36 (GND)     ┌────────────┐
-                       │ +12V → LCD Pin 35 (VGON)
-                       │ -12V → LCD Pin 33 (VSS)
-                       │ +12V → CCFL インバーター
+LCD Pin 3,7,14,       MC34063 + 反転           LCD GND
+30,32,34,36 (GND)     チャージポンプ
+                       ┌────────────┐
+                       │ +13.8V → LCD Pin 35 (VGON)
+                       │ -13.8V → LCD Pin 33 (VSS)
+                       │ +13.8V → CCFL インバーター
                        └────────────┘
 
 LCD Pin 1 (TEST)   → GND (通常表示)
@@ -316,8 +317,8 @@ LCD Pin 29 (Vo)    → 10kΩ VR → 0〜3V (コントラスト調整)
 |------|------|--------|--------|
 | 3.3V | 3.3V | Pico 3V3_OUT (最大300mA) | LCD DVDD (Pin 21), AVDD (Pin 28) |
 | 5V | 5V | USB VBUS | LCD GVDD (Pin 31) |
-| +12V | +12V | DC-DC 昇圧 | LCD VGON (Pin 35), CCFL インバーター |
-| −12V | −12V | DC-DC 反転 | LCD VSS (Pin 33) |
+| +13.8V | 約+13.8V | MC34063昇圧（R7/L1/D4） | LCD VGON (Pin 35), CCFL インバーター |
+| −13.8V | 約−13.8V | ショットキー2個＋コンデンサ2個の反転チャージポンプ | LCD VSS (Pin 33) |
 
 ### 3.3V 供給の注意
 
@@ -355,10 +356,10 @@ FPC コネクタの挿入方向（表裏）に注意。
 - [ ] LCD Pin 21 (DVDD) → 3.3V
 - [ ] LCD Pin 28 (AVDD) → 3.3V
 - [ ] LCD Pin 31 (GVDD) → 5V (or 3.3V)
-- [ ] LCD Pin 35 (VGON) → +12V
-- [ ] LCD Pin 33 (VSS) → −12V
+- [ ] LCD Pin 35 (VGON) → +13.8V
+- [ ] LCD Pin 33 (VSS) → −13.8V
 - [ ] LCD Pin 3, 7, 14, 30, 32, 34, 36 (GND) → GND
-- [ ] CCFL インバーター → DC 12V + バックライト接続
+- [ ] CCFL インバーター → +13.8V入力の適合性を確認してから接続
 
 ### 調整（推奨）
 - [ ] LCD Pin 29 (Vo) → 10kΩ VR (0〜3V)
