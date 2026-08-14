@@ -8,7 +8,7 @@ KiCad 9.0.1で開ける、銅箔配線前のキャリア基板ドラフトです
 - `pico_lta042b010f_carrier.kicad_sch` — 更新済み回路図
 - `pico_lta042b010f_carrier.kicad_pcb` — 120 mm x 70 mm、部品配置済み・未配線
 - `pico_lta042b010f_carrier.kicad_sym` / `sym-lib-table` — 埋め込み記号とローカル記号ライブラリ設定
-- `pico_lta042b010f_carrier-kicad-native-reviewed.pdf` — KiCad純正のA3 PDF
+- `pico_lta042b010f_carrier-kicad-native-reviewed.pdf` — KiCad純正のA4 PDF
 - `pico_lta042b010f_carrier-kicad-native-reviewed-preview.png` — 上記PDFをそのままラスタライズした確認画像
 - `pico_lta042b010f_carrier-pcb-3d-top.png` — KiCad純正PCB 3Dトップ表示
 - `pico_lta042b010f_carrier-reviewed-erc.txt` / `pico_lta042b010f_carrier-reviewed-drc.txt` — 検査結果
@@ -41,11 +41,22 @@ Picoのフットプリントは、Raspberry Pi公式資料のPico W/Pico 2 W共�
 
 ## 回路図の接続点整理
 
-- 整理前106個から、重複・直線上の不要点を33個削減し、73個に整理
+- 整理前106個から、重複・直線上の不要点を整理し、最終71個に整理
 - T字分岐、交差接続、シンボルのピン端点、ERC上必要な終端アンカーは保持
 - 4方向接続は2箇所を残し、レビュー対象としてレポート化
-- 整理前後でネット数43、ピン接続の変更0、ERCエラー／警告0を確認
-- 未接続配線やラベルは自動削除していません
+- 整理前後でネット定義44件、ピン接続の変更0、ERCエラー／警告0を確認
+- 信号配線は保持し、明らかに余っていた+13Vレール末端だけを短縮
+
+## 回路図の視覚整理
+
+- 部品のReference／Valueを部品の回転とは独立して水平配置し、配線上から移動
+- R7、L1、D4、R9、R11、D5、D6、D7、C11、D8など、縦向き・上下反転・隣接文字の重なりを修正
+- J2周辺、MC34063周辺、RV1の+3V3表示を整理し、短い明示配線で確認できる状態に変更
+- 電源フラグのシンボルは保持しつつ、`PWR_FLAG` の冗長な文字列を非表示にし、電源ネット名との重なりを解消
+- +13V8上側レールの明らかに余った末端配線を削除し、実際の分岐位置で終端
+- 回路図をA3からA4横向きへ変更し、回路本体を拡大してタイトルブロックとの干渉を解消
+- 内部接続補助ラベルは電気的接続を保持するため残していますが、通常の画像表示では読めない極小サイズです
+- KiCad純正PDFは1ページ、整理後ERCはエラー0／警告0、ネットリスト差分は0です
 
 U3は、SwEをGNDへ意図的に接続するこの回路でERCを成立させるため、埋め込み記号の該当ピンをpassiveとして扱っています。そのためプロジェクトでは、この意図的な記号差分だけ`lib_symbol_mismatch`を無視しています。実機のMC34063AD品種とデータシートを再確認してください。
 

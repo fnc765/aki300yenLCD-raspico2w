@@ -14,6 +14,11 @@ OUT = Path(r"C:\Users\choco\AppData\Local\Temp\kicad-reviewed-candidate")
 KI_SYMBOLS = Path(r"C:\Program Files\KiCad\9.0\share\kicad\symbols")
 KI_FOOTPRINTS = Path(r"C:\Program Files\KiCad\9.0\share\kicad\footprints")
 
+# Keep electrical coordinates on the original 1.27 mm grid and translate
+# only the plotted sheet objects onto an A4 landscape page at the end.
+SHEET_OFFSET_X = -60.96
+SHEET_OFFSET_Y = -60.96
+
 
 def uid() -> str:
     return str(uuid.uuid4())
@@ -150,6 +155,74 @@ def absolute_visible_properties(block: str, x: float, y: float, rotation: float)
     return block
 
 
+# Explicit field placement keeps annotations readable even when a component
+# is rotated for the power path.  Displayed fields remain horizontal and are
+# placed away from the wire carrying the component pins.
+FIELD_LAYOUTS: dict[str, dict[str, tuple[float, float, float]]] = {
+    "U1": {"Reference": (179.07, 133.35, 0), "Value": (179.07, 199.39, 0)},
+    "J1": {"Reference": (238.76, 119.38, 0), "Value": (238.76, 218.44, 0)},
+    "J2": {"Reference": (139.70, 90.17, 0), "Value": (130.81, 106.68, 0)},
+    "J3": {"Reference": (279.40, 148.59, 0), "Value": (279.40, 161.29, 0)},
+    "U3": {"Reference": (168.91, 88.90, 0), "Value": (179.07, 116.84, 0)},
+    "R7": {"Reference": (149.86, 77.47, 0), "Value": (149.86, 74.93, 0)},
+    "L1": {"Reference": (163.83, 77.47, 0), "Value": (163.83, 74.93, 0)},
+    "D4": {"Reference": (180.34, 77.47, 0), "Value": (180.34, 74.93, 0)},
+    "R8": {"Reference": (142.24, 93.98, 0), "Value": (149.86, 91.44, 0)},
+    "C6": {"Reference": (151.00, 102.87, 0), "Value": (151.00, 109.22, 0)},
+    "C7": {"Reference": (154.94, 112.00, 0), "Value": (154.94, 116.00, 0)},
+    "R9": {"Reference": (214.63, 91.44, 0), "Value": (214.63, 96.52, 0)},
+    "R10": {"Reference": (202.00, 113.03, 0), "Value": (202.00, 118.11, 0)},
+    "C8": {"Reference": (185.42, 91.44, 0), "Value": (185.42, 96.52, 0)},
+    "R11": {"Reference": (230.00, 91.44, 0), "Value": (230.00, 96.52, 0)},
+    "D5": {"Reference": (230.00, 103.00, 0), "Value": (230.00, 109.22, 0)},
+    "C9": {"Reference": (248.00, 92.71, 0), "Value": (248.00, 99.06, 0)},
+    "D7": {"Reference": (260.35, 99.06, 0), "Value": (260.35, 96.52, 0)},
+    "D6": {"Reference": (253.00, 111.76, 0), "Value": (253.00, 116.84, 0)},
+    "C11": {"Reference": (271.78, 111.76, 0), "Value": (271.78, 116.84, 0)},
+    "D8": {"Reference": (292.00, 111.76, 0), "Value": (292.00, 116.84, 0)},
+    "R16": {"Reference": (292.00, 123.19, 0), "Value": (292.00, 130.81, 0)},
+    "RV1": {"Reference": (287.02, 173.99, 0), "Value": (279.40, 190.50, 0)},
+}
+
+
+def set_property_position(
+    block: str, property_name: str, x: float, y: float, rotation: float = 0
+) -> str:
+    property_start = block.find(f'(property "{property_name}"')
+    if property_start < 0:
+        return block
+    property_end = find_balanced(block, property_start)
+    property_block = block[property_start:property_end]
+    at_match = re.search(
+        r'\(at\s+-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?(?:\s+-?\d+(?:\.\d+)?)?\)',
+        property_block,
+    )
+    if not at_match:
+        return block
+    replacement = f"(at {fmt(x)} {fmt(y)} {fmt(rotation)})"
+    property_block = (
+        property_block[:at_match.start()]
+        + replacement
+        + property_block[at_match.end():]
+    )
+    return block[:property_start] + property_block + block[property_end:]
+
+
+def apply_field_layout(block: str, reference: str, symbol_rotation: float = 0) -> str:
+    for property_name, coordinates in FIELD_LAYOUTS.get(reference, {}).items():
+        x, y, layout_rotation = coordinates
+        # Symbol properties inherit the instance rotation in KiCad.  Apply
+        # the inverse here so every displayed annotation remains horizontal.
+        if round(symbol_rotation) % 360 == 180:
+            # KiCad already keeps text upright for a 180-degree symbol; do
+            # not apply a second half-turn to these fields.
+            field_rotation = layout_rotation
+        else:
+            field_rotation = (layout_rotation - symbol_rotation) % 360
+        block = set_property_position(block, property_name, x, y, field_rotation)
+    return block
+
+
 def properties_are_sheet_absolute(block: str) -> bool:
     """Detect an already-reviewed instance so regeneration is idempotent."""
     for property_name in ("Reference", "Value"):
@@ -190,7 +263,7 @@ def instance_from_old(
         block = replace_property(block, "Value", value)
     if not properties_are_sheet_absolute(block):
         block = absolute_visible_properties(block, position[0], position[1], rotation)
-    return block
+    return apply_field_layout(block, ref, rotation)
 
 
 def wire(x1: float, y1: float, x2: float, y2: float) -> str:
@@ -203,6 +276,28 @@ def wire(x1: float, y1: float, x2: float, y2: float) -> str:
 \t\t(stroke (width 0) (type solid))
 \t\t(uuid "{uid()}")
 \t)'''
+
+
+def translate_sheet_block(block: str, dx: float, dy: float) -> str:
+    """Translate plotted sheet coordinates while leaving local fields at 0,0."""
+    pattern = re.compile(
+        r'(?P<prefix>\((?:at|xy)\s+)'
+        r'(?P<x>-?\d+(?:\.\d+)?)\s+'
+        r'(?P<y>-?\d+(?:\.\d+)?)(?P<rest>[^\r\n\)]*)'
+    )
+
+    def replace(match: re.Match[str]) -> str:
+        x = float(match.group("x"))
+        y = float(match.group("y"))
+        # Instance metadata uses local (0, 0) coordinates and must not move.
+        if abs(x) < 50 and abs(y) < 50:
+            return match.group(0)
+        return (
+            f'{match.group("prefix")}{fmt(x + dx)} {fmt(y + dy)}'
+            f'{match.group("rest")}'
+        )
+
+    return pattern.sub(replace, block)
 
 
 def junction(x: float, y: float) -> str:
@@ -305,14 +400,19 @@ def label(name: str, x: float, y: float, rotation: float = 0) -> str:
 
 
 def hidden_label(name: str, x: float, y: float, rotation: float = 0) -> str:
+    # These labels bridge legacy pin-to-wire coordinate differences while the
+    # visible drawing remains wire-first.  KiCad 9 CLI plotting can include
+    # hidden local labels, so use a sub-pixel font as a compatibility fallback.
     return f'''\t(label "{name}"
 \t\t(at {fmt(x)} {fmt(y)} {fmt(rotation)})
-\t\t(effects (font (size 0.9 0.9)) hide)
+\t\t(effects (font (size 0.01 0.01)) (hide yes))
 \t\t(uuid "{uid()}")
 \t)'''
 
 
-def power_symbol(lib_id: str, reference: str, x: float, y: float) -> str:
+def power_symbol(
+    lib_id: str, reference: str, x: float, y: float, hide_value: bool = False
+) -> str:
     if lib_id == "power:GND":
         ref_at, value, value_at = "0 -6.35 0", "GND", "0 -3.81 0"
     elif lib_id == "power:+5V":
@@ -325,11 +425,15 @@ def power_symbol(lib_id: str, reference: str, x: float, y: float) -> str:
         raise ValueError(lib_id)
     ref_at = absolute_at(ref_at, x, y)
     value_at = absolute_at(value_at, x, y)
+    value_effects = "(effects (font (size 1.27 1.27))"
+    if hide_value:
+        value_effects += " hide"
+    value_effects += ")"
     return f'''\t(symbol (lib_id "{lib_id}") (at {fmt(x)} {fmt(y)} 0) (unit 1)
 \t\t(exclude_from_sim no) (in_bom no) (on_board yes) (dnp no)
 \t\t(uuid "{uid()}")
 \t\t(property "Reference" "{reference}" (at {ref_at}) (effects (font (size 1.27 1.27)) hide))
-\t\t(property "Value" "{value}" (at {value_at}) (effects (font (size 1.27 1.27))))
+\t\t(property "Value" "{value}" (at {value_at}) {value_effects})
 \t\t(property "Footprint" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
 \t\t(property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
 \t\t(property "Description" "" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
@@ -418,6 +522,7 @@ def make_footprint(
 
 def build_schematic() -> None:
     source = SRC_SCH.read_text(encoding="utf-8")
+    source_is_reviewed = '(paper "A4")' in source
     lib_start = source.index('(lib_symbols')
     lib_end = find_balanced(source, lib_start)
     lib_block = source[lib_start:lib_end]
@@ -522,15 +627,20 @@ def build_schematic() -> None:
     for block in objects:
         if block.startswith("(no_connect"):
             at = get_first_at(block)
-            if at and ((160 <= at[0] <= 190 and at[1] >= 140) or (228 <= at[0] <= 234 and at[1] >= 120)):
-                root.append(block)
+            if at:
+                logical_x = at[0] - SHEET_OFFSET_X if source_is_reviewed else at[0]
+                logical_y = at[1] - SHEET_OFFSET_Y if source_is_reviewed else at[1]
+                if (160 <= logical_x <= 190 and logical_y >= 140) or (228 <= logical_x <= 234 and logical_y >= 120):
+                    root.append(translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block)
         elif block.startswith("(label"):
             at = get_first_at(block)
             if not at:
                 continue
             x, y, _ = at
-            if (160 <= x <= 190 and y >= 140) or (228 <= x <= 234 and y >= 120):
-                root.append(block)
+            logical_x = x - SHEET_OFFSET_X if source_is_reviewed else x
+            logical_y = y - SHEET_OFFSET_Y if source_is_reviewed else y
+            if (160 <= logical_x <= 190 and logical_y >= 140) or (228 <= logical_x <= 234 and logical_y >= 120):
+                root.append(translate_sheet_block(block, -SHEET_OFFSET_X, -SHEET_OFFSET_Y) if source_is_reviewed else block)
 
     gnd_y, plus_y = 139.70, 82.55
     wires = [
@@ -566,8 +676,9 @@ def build_schematic() -> None:
         wire(208.28, 97.79, 208.28, 116.84), wire(208.28, 111.76, 208.28, 116.84),
         wire(208.28, 119.38, 208.28, gnd_y),
 
-        # +13 rail and positive LED
-        wire(184.15, 82.55, 299.72, 82.55), wire(190.50, 90.17, 190.50, 82.55),
+        # +13 rail and positive LED. Stop the rail at the last actual branch;
+        # the previous extension to x=299.72 was a visually dangling wire.
+        wire(184.15, 82.55, 242.57, 82.55), wire(190.50, 90.17, 190.50, 82.55),
         wire(190.50, 97.79, 190.50, gnd_y), wire(208.28, 90.17, 208.28, 82.55),
         wire(224.79, 90.17, 224.79, 82.55), wire(224.79, 97.79, 224.79, 102.87),
         wire(224.79, 110.49, 224.79, gnd_y),
@@ -583,6 +694,7 @@ def build_schematic() -> None:
         # External connector and trim
         wire(274.32, 153.67, 270.51, 153.67),
         wire(274.32, 156.21, 266.70, 156.21), wire(266.70, 156.21, 266.70, gnd_y),
+        wire(279.40, 168.91, 279.40, 176.53),
         wire(279.40, 184.15, 279.40, 190.50), wire(283.21, 180.34, 287.02, 180.34),
         wire(118.11, gnd_y, 299.72, gnd_y),
     ]
@@ -632,7 +744,7 @@ def build_schematic() -> None:
         add_junction_candidate(x, y)
     for x, y in [
         (146.05, 82.55), (153.67, 82.55), (160.02, 82.55), (167.64, 82.55),
-        (176.53, 82.55), (299.72, 82.55), (190.50, 90.17), (208.28, 90.17),
+        (176.53, 82.55), (190.50, 90.17), (208.28, 90.17),
         (224.79, 90.17), (242.57, 92.71), (154.94, 96.52), (158.75, 96.52),
         (179.07, 96.52), (130.81, 97.79), (190.50, 97.79), (208.28, 97.79),
         (224.79, 97.79), (134.62, 99.06), (146.05, 99.06), (175.26, 99.06),
@@ -655,10 +767,14 @@ def build_schematic() -> None:
         f"four-way junctions retained for review: {len(four_way_junctions)}",
         "",
         "Rule: retain T/cross junctions, symbol pin endpoints, and terminal anchors.",
-        "No dangling wires or labels are deleted by this cleanup.",
+        "Signal wiring is preserved; only the visually dangling +13V rail extension is shortened.",
+        "Internal helper labels remain electrically present at sub-pixel size for legacy pin endpoints.",
         "",
         "Retained four-way coordinates:",
-        *(f"  {x:.3f}, {y:.3f}" for x, y in four_way_junctions),
+        *(
+            f"  {x + SHEET_OFFSET_X:.3f}, {y + SHEET_OFFSET_Y:.3f}"
+            for x, y in four_way_junctions
+        ),
     ]
     (OUT / "pico_lta042b010f_carrier-junction-cleanup.txt").write_text("\n".join(report) + "\n", encoding="utf-8")
 
@@ -682,24 +798,28 @@ def build_schematic() -> None:
         hidden_label("-13V8", 264.16, 104.14), hidden_label("-13V8", 278.13, 110.49),
         hidden_label("GND", 278.13, 118.11), hidden_label("GND", 274.32, 156.21),
         hidden_label("GND", 279.40, 184.15), hidden_label("+5V", 130.81, 82.55),
-        label("GND", 125.73, gnd_y), label("+13V8", 196.85, plus_y),
-        label("-13V8", 285.75, 104.14), label("SW_NODE", 176.53, 82.55),
-        label("SW_NODE", 179.07, 101.60), label("+13V8", 270.51, 153.67),
+        label("+3V3", 279.40, 168.91), label("GND", 125.73, gnd_y),
+        label("+13V8", 196.85, plus_y, 180),
+        label("-13V8", 285.75, 104.14, 180), hidden_label("SW_NODE", 176.53, 82.55, 180),
+        hidden_label("SW_NODE", 179.07, 101.60), label("+13V8", 270.51, 153.67),
         label("VCPP_ADJ", 287.02, 180.34),
     ])
     root.extend([
         power_symbol("power:+5V", "#PWR0101", 127.00, 82.55),
-        power_symbol("power:+3V3", "#PWR0103", 279.40, 176.53),
-        power_symbol("power:PWR_FLAG", "#FLG0101", 130.81, 82.55),
-        power_symbol("power:PWR_FLAG", "#FLG0102", 125.73, gnd_y),
-        power_symbol("power:PWR_FLAG", "#FLG0103", 196.85, 82.55),
-        power_symbol("power:PWR_FLAG", "#FLG0104", 285.75, 104.14),
+        power_symbol("power:+3V3", "#PWR0103", 279.40, 176.53, hide_value=True),
+        power_symbol("power:PWR_FLAG", "#FLG0101", 130.81, 82.55, hide_value=True),
+        power_symbol("power:PWR_FLAG", "#FLG0102", 125.73, gnd_y, hide_value=True),
+        power_symbol("power:PWR_FLAG", "#FLG0103", 196.85, 82.55, hide_value=True),
+        power_symbol("power:PWR_FLAG", "#FLG0104", 285.75, 104.14, hide_value=True),
     ])
+    # Center the assembled sheet objects on a readable A4 landscape page.
+    root = [translate_sheet_block(block, SHEET_OFFSET_X, SHEET_OFFSET_Y) for block in root]
     if not sheet_instance:
         raise ValueError("sheet_instances missing")
     root.append(sheet_instance)
 
     header = source[:lib_start]
+    header = header.replace('(paper "A3")', '(paper "A4")')
     header = header.replace('"Codex draft - verify against prototype"', '"Codex reviewed KiCad draft"')
     header = header.replace('"FFC connector contact side and exact part number are provisional"', '"Pico 2 W hand-solder footprint and TE FFC footprint selected from KiCad libraries"')
     schematic = header + new_lib + "\n" + "\n\n".join(root) + "\n)\n"

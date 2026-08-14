@@ -1,7 +1,7 @@
 (export (version "E")
   (design
     (source "C:\\Users\\choco\\AppData\\Local\\Temp\\kicad-reviewed-candidate\\pico_lta042b010f_carrier.kicad_sch")
-    (date "2026-08-14T14:55:54+0900")
+    (date "2026-08-14T15:50:27+0900")
     (tool "Eeschema 9.0.1")
     (sheet (number "1") (name "/") (tstamps "/")
       (title_block
