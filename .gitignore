@@ -2,3 +2,6 @@
 **/*.rs.bk
 *.swp
 *.swo
+
+# Codex-provided attachments are workspace metadata, not project sources.
+/.codex-remote-attachments/
