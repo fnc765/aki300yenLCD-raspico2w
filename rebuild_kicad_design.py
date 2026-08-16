@@ -69,6 +69,29 @@ def extract_symbol(text: str, name: str) -> str:
     return text[start:find_balanced(text, start)]
 
 
+def tune_pico_symbol_visuals(symbol: str) -> str:
+    """Improve Pico pin-name legibility without changing pin endpoints.
+
+    The custom Pico symbol uses 2.54 mm rows with long names on both sides of
+    a narrow body.  Keep every pin's connection coordinate and electrical
+    metadata unchanged, but widen the body, shorten the graphic pin line to
+    the new body edge, and use the same readable 0.8 mm pin-name size as the
+    LCD connector symbol.
+    """
+    symbol = symbol.replace(
+        '(rectangle (start -5.08 -26.67) (end 5.08 26.67)',
+        '(rectangle (start -6.35 -26.67) (end 6.35 26.67)',
+        1,
+    )
+    symbol = symbol.replace('(length 2.54)', '(length 1.27)')
+    symbol = re.sub(
+        r'(\(name "[^"]+" \(effects \(font \(size )1 1',
+        r'\g<1>0.8 0.8',
+        symbol,
+    )
+    return symbol
+
+
 def qualify_symbol(block: str, library: str, name: str) -> str:
     return block.replace(f'(symbol "{name}"', f'(symbol "{library}:{name}"', 1)
 
@@ -612,7 +635,7 @@ def build_schematic() -> None:
         if library == "Regulator_Switching" and source_name == "MC33063AD":
             qualified = qualified.replace('(pin open_emitter line', '(pin passive line')
         standard_blocks.append(qualified)
-    custom_pico_sch = extract_symbol(lib_block, "Custom:Pico_2W_40P")
+    custom_pico_sch = tune_pico_symbol_visuals(extract_symbol(lib_block, "Custom:Pico_2W_40P"))
     custom_lcd_sch = extract_symbol(lib_block, "Custom:LTA042B010F_FFC36")
     custom_lcd_sch = custom_lcd_sch.replace('(pin power_in line', '(pin passive line')
     # Keep only the two custom symbols still used by the reviewed design.
@@ -1099,7 +1122,7 @@ def build_schematic() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "pico_lta042b010f_carrier.kicad_sch").write_text(schematic, encoding="utf-8")
 
-    custom_pico = extract_symbol(lib_block, "Custom:Pico_2W_40P").replace('(symbol "Custom:Pico_2W_40P"', '(symbol "Pico_2W_40P"', 1)
+    custom_pico = tune_pico_symbol_visuals(extract_symbol(lib_block, "Custom:Pico_2W_40P")).replace('(symbol "Custom:Pico_2W_40P"', '(symbol "Pico_2W_40P"', 1)
     custom_lcd = extract_symbol(lib_block, "Custom:LTA042B010F_FFC36").replace('(symbol "Custom:LTA042B010F_FFC36"', '(symbol "LTA042B010F_FFC36"', 1)
     custom_lcd = custom_lcd.replace('(pin power_in line', '(pin passive line')
     custom_lib = '(kicad_symbol_lib (version 20241209) (generator "kicad_symbol_editor") (generator_version "9.0")\n' + custom_pico + "\n" + custom_lcd + "\n)\n"
