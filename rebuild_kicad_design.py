@@ -92,6 +92,212 @@ def tune_pico_symbol_visuals(symbol: str) -> str:
     return symbol
 
 
+AKIZUKI_COMPONENT_FIELDS: dict[str, dict[str, str]] = {
+    "R7": {
+        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
+        "MPN": "MFU100F0R47B",
+        "AkizukiCode": "108800",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g108800/",
+        "SelectionNote": "0.47ohm +/-1%; 1W; axial through-hole; hand-solder",
+    },
+    "R8": {
+        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
+        "MPN": "RC0603J200R",
+        "AkizukiCode": "131855",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g131855/",
+        "SelectionNote": "200ohm +/-5%; 0.1W; 0603/1608 SMD; hand-solderable",
+    },
+    "R9": {
+        "Manufacturer": "SUSUMU / SSM",
+        "MPN": "RG2012-N-103-B-T5",
+        "AkizukiCode": "111797",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g111797/",
+        "SelectionNote": "10kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+    },
+    "R10": {
+        "Manufacturer": "SUSUMU / SSM",
+        "MPN": "RG2012N-102-B-T5",
+        "AkizukiCode": "111796",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g111796/",
+        "SelectionNote": "1kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+    },
+    "R11": {
+        "Manufacturer": "SUSUMU / SSM",
+        "MPN": "RG2012-N-103-B-T5",
+        "AkizukiCode": "111797",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g111797/",
+        "SelectionNote": "10kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+    },
+    "R16": {
+        "Manufacturer": "SUSUMU / SSM",
+        "MPN": "RG2012-N-103-B-T5",
+        "AkizukiCode": "111797",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g111797/",
+        "SelectionNote": "10kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+    },
+    "L1": {
+        "Manufacturer": "Taiyo Yuden",
+        "MPN": "NR10050T101M",
+        "AkizukiCode": "108325",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g108325/",
+        "SelectionNote": "100uH; hand-solder footprint; linked product",
+    },
+    "C6": {
+        "Manufacturer": "Rubycon",
+        "MPN": "35ZLH220MEFCCT8X11.5",
+        "AkizukiCode": "111758",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g111758/",
+        "SelectionNote": "220uF 35V; linked item sold out; current equivalent candidate 102718",
+    },
+    "C8": {
+        "Manufacturer": "Rubycon",
+        "MPN": "35PX47MEFC5X11",
+        "AkizukiCode": "117887",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g117887/",
+        "SelectionNote": "47uF 35V; radial through-hole",
+    },
+    "C7": {
+        "Manufacturer": "Murata",
+        "MPN": "RDE5C1H471J0P1H03B",
+        "AkizukiCode": "131236",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g131236/",
+        "SelectionNote": "470pF 50V C0G +/-5%; radial through-hole; 2.5mm pitch",
+    },
+    "C9": {
+        "Manufacturer": "Rubycon",
+        "MPN": "50PX10MEFC5X11",
+        "AkizukiCode": "117897",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g117897/",
+        "SelectionNote": "10uF 50V 105C; radial through-hole",
+    },
+    "C11": {
+        "Manufacturer": "Rubycon",
+        "MPN": "50PX10MEFC5X11",
+        "AkizukiCode": "117897",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g117897/",
+        "SelectionNote": "10uF 50V 105C; radial through-hole; positive terminal to GND",
+    },
+    "D4": {
+        "Manufacturer": "WUXI XUYANG ELECTRONICS",
+        "MPN": "1N5819",
+        "AkizukiCode": "117244",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g117244/",
+        "SelectionNote": "40V 1A Schottky; DO-41 through-hole",
+    },
+    "D6": {
+        "Manufacturer": "WUXI XUYANG ELECTRONICS",
+        "MPN": "1N5819",
+        "AkizukiCode": "117244",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g117244/",
+        "SelectionNote": "40V 1A Schottky; DO-41 through-hole",
+    },
+    "D7": {
+        "Manufacturer": "WUXI XUYANG ELECTRONICS",
+        "MPN": "1N5819",
+        "AkizukiCode": "117244",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g117244/",
+        "SelectionNote": "40V 1A Schottky; DO-41 through-hole",
+    },
+    "D5": {
+        "Manufacturer": "OptoSupply",
+        "MPN": "OSG50805C1C",
+        "AkizukiCode": "106423",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g106423/",
+        "SelectionNote": "green LED; 2012/0805 SMD; hand-solderable",
+    },
+    "D8": {
+        "Manufacturer": "OptoSupply",
+        "MPN": "OSR50805C1C",
+        "AkizukiCode": "106419",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g106419/",
+        "SelectionNote": "red LED; 2012/0805 SMD; hand-solderable",
+    },
+    "RV1": {
+        "Manufacturer": "Bourns",
+        "MPN": "3296W-1-103LF",
+        "AkizukiCode": "100975",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g100975/",
+        "SelectionNote": "10kohm vertical multiturn trimmer; through-hole",
+    },
+    "J2": {
+        "Manufacturer": "Chang Enn",
+        "MPN": "PH-1X2SG",
+        "AkizukiCode": "108593",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g108593/",
+        "SelectionNote": "straight 1x2 2.54mm pin header; through-hole",
+    },
+    "J3": {
+        "Manufacturer": "Chang Enn",
+        "MPN": "PH-1X2SG",
+        "AkizukiCode": "108593",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g108593/",
+        "SelectionNote": "straight 1x2 2.54mm pin header; through-hole",
+    },
+    "U3": {
+        "Manufacturer": "TAEJIN TECHNOLOGY",
+        "MPN": "MC34063AD",
+        "AkizukiCode": "117573",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g117573/",
+        "SelectionNote": "SOP-8; hand-solderable 1.27mm pitch",
+    },
+    "U1": {
+        "Manufacturer": "Raspberry Pi Foundation",
+        "MPN": "SC1633",
+        "AkizukiCode": "130330",
+        "Supplier": "Akizuki Denshi",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g130330/",
+        "SelectionNote": "Raspberry Pi Pico 2 W module",
+    },
+}
+
+
+def set_component_fields(block: str, reference: str) -> str:
+    """Attach procurement metadata without displaying it on the schematic."""
+    fields = AKIZUKI_COMPONENT_FIELDS.get(reference)
+    if not fields:
+        return block
+    for name, value in fields.items():
+        value = value.replace('\\', '\\\\').replace('"', '\\"')
+        marker = f'(property "{name}"'
+        if marker in block:
+            block = replace_property(block, name, value)
+            continue
+        description_start = block.find('(property "Description"')
+        if description_start < 0:
+            insertion = block.find('\n\t\t(pin ')
+            if insertion < 0:
+                insertion = block.rfind('\n')
+        else:
+            insertion = block.rfind('\n', 0, description_start) + 1
+        property_text = (
+            f'\t\t(property "{name}" "{value}" '
+            '(at 0 0 0) (effects (font (size 1.27 1.27)) hide))\n'
+        )
+        block = block[:insertion] + property_text + block[insertion:]
+    return block
+
+
 def qualify_symbol(block: str, library: str, name: str) -> str:
     return block.replace(f'(symbol "{name}"', f'(symbol "{library}:{name}"', 1)
 
@@ -286,7 +492,8 @@ def instance_from_old(
         block = replace_property(block, "Value", value)
     if not properties_are_sheet_absolute(block):
         block = absolute_visible_properties(block, position[0], position[1], rotation)
-    return apply_field_layout(block, ref, rotation)
+    block = apply_field_layout(block, ref, rotation)
+    return set_component_fields(block, ref)
 
 
 def wire(x1: float, y1: float, x2: float, y2: float) -> str:
@@ -707,21 +914,21 @@ def build_schematic() -> None:
         ("J2", "Connector_Generic:Conn_01x02", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", (139.70, 100.33), 0, "5V INPUT"),
         ("J3", "Connector_Generic:Conn_01x02", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", (279.40, 153.67), 0, "13V8 OUT"),
         ("U3", "Regulator_Switching:MC33063AD", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", (168.91, 101.60), 0, "MC34063AD"),
-        ("R7", "Device:R", "Resistor_SMD:R_2512_6332Metric_Pad1.40x3.35mm_HandSolder", (149.86, 82.55), 270, "0.47R 1%"),
-        ("L1", "Device:L", "Inductor_SMD:L_Sunlord_MWSA1204S-150", (163.83, 82.55), 270, "150uH"),
-        ("D4", "Device:D_Schottky", "Diode_SMD:D_SMA", (180.34, 82.55), 180, "1N5819"),
-        ("R8", "Device:R", "Resistor_SMD:R_0805_2012Metric", (149.86, 99.06), 90, "200"),
-        ("C6", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (130.81, 105.41), 0, "220u 16V"),
-        ("C7", "Device:C", "Capacitor_SMD:C_0805_2012Metric", (149.86, 115.57), 0, "470p"),
+        ("R7", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (149.86, 82.55), 270, "0.47R 1%"),
+        ("L1", "Device:L", "Inductor_SMD:L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering", (163.83, 82.55), 270, "100uH"),
+        ("D4", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (180.34, 82.55), 180, "1N5819"),
+        ("R8", "Device:R", "Resistor_SMD:R_0603_1608Metric", (149.86, 99.06), 90, "200"),
+        ("C6", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", (130.81, 105.41), 0, "220uF 35V"),
+        ("C7", "Device:C", "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm", (149.86, 115.57), 0, "470pF 50V C0G"),
         ("R9", "Device:R", "Resistor_SMD:R_0805_2012Metric", (208.28, 93.98), 0, "10k 1%"),
         ("R10", "Device:R", "Resistor_SMD:R_0805_2012Metric", (208.28, 115.57), 0, "1k 1%"),
-        ("C8", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (190.50, 93.98), 0, "47u 25V"),
+        ("C8", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (190.50, 93.98), 0, "47uF 35V"),
         ("R11", "Device:R", "Resistor_SMD:R_0805_2012Metric", (224.79, 93.98), 0, "10k 1%"),
         ("D5", "Device:LED", "LED_SMD:LED_0805_2012Metric", (224.79, 106.68), 90, "GREEN LED"),
-        ("C9", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (242.57, 96.52), 0, "10u 25V"),
-        ("D7", "Device:D_Schottky", "Diode_SMD:D_SMA", (260.35, 104.14), 180, "1N5819"),
-        ("D6", "Device:D_Schottky", "Diode_SMD:D_SMA", (247.65, 114.30), 90, "1N5819"),
-        ("C11", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (278.13, 114.30), 180, "10u 25V"),
+        ("C9", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (242.57, 96.52), 0, "10uF 50V"),
+        ("D7", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (260.35, 104.14), 180, "1N5819"),
+        ("D6", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (247.65, 114.30), 90, "1N5819"),
+        ("C11", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (278.13, 114.30), 180, "10uF 50V"),
         ("D8", "Device:LED", "LED_SMD:LED_0805_2012Metric", (299.72, 114.30), 270, "RED LED"),
         ("R16", "Device:R", "Resistor_SMD:R_0805_2012Metric", (299.72, 127.00), 0, "10k 1%"),
         ("RV1", "Device:R_Potentiometer", "Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical", (279.40, 180.34), 0, "10k TRIM"),
@@ -1161,10 +1368,10 @@ def build_pcb() -> None:
         "J3": (KI_FOOTPRINTS / "Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod", "Connector_PinHeader_2.54mm", "CCFL_INVERTER_13V8", (105, 15), 0),
         "RV1": (KI_FOOTPRINTS / "Potentiometer_THT.pretty/Potentiometer_Bourns_3296W_Vertical.kicad_mod", "Potentiometer_THT", "10k_CONTRAST_TRIM", (78, 60), 0),
         "U3": (KI_FOOTPRINTS / "Package_SO.pretty/SOIC-8_3.9x4.9mm_P1.27mm.kicad_mod", "Package_SO", "MC34063AD", (85, 35), 0),
-        "R7": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_2512_6332Metric_Pad1.40x3.35mm_HandSolder.kicad_mod", "Resistor_SMD", "0.47R 1%", (72, 22), 0),
-        "R8": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "200", (78, 35), 90), "R9": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (101, 35), 90), "R10": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "1k", (101, 48), 90), "R11": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (109, 35), 90), "R16": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (107, 63), 90),
-        "L1": (KI_FOOTPRINTS / "Inductor_SMD.pretty/L_Sunlord_MWSA1204S-150.kicad_mod", "Inductor_SMD", "150uH", (85, 22), 0), "D4": (KI_FOOTPRINTS / "Diode_SMD.pretty/D_SMA.kicad_mod", "Diode_SMD", "1N5819", (100, 22), 0), "D6": (KI_FOOTPRINTS / "Diode_SMD.pretty/D_SMA.kicad_mod", "Diode_SMD", "1N5819", (105, 42), 90), "D7": (KI_FOOTPRINTS / "Diode_SMD.pretty/D_SMA.kicad_mod", "Diode_SMD", "1N5819", (110, 22), 0), "D5": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "GREEN LED", (109, 45), 90), "D8": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "RED LED", (107, 55), 90),
-        "C6": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "220u 16V", (72, 35), 0), "C8": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "47u 25V", (95, 38), 0), "C9": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10u 25V", (98, 30), 90), "C11": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10u 25V (+ to GND)", (113, 45), 0), "C7": (KI_FOOTPRINTS / "Capacitor_SMD.pretty/C_0805_2012Metric.kicad_mod", "Capacitor_SMD", "470p", (72, 50), 90),
+        "R7": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "0.47R 1%", (72, 12), 0),
+        "R8": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0603_1608Metric.kicad_mod", "Resistor_SMD", "200", (80, 35), 90), "R9": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (101, 35), 90), "R10": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "1k", (101, 48), 90), "R11": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (109, 35), 90), "R16": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (107, 63), 90),
+        "L1": (KI_FOOTPRINTS / "Inductor_SMD.pretty/L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering.kicad_mod", "Inductor_SMD", "100uH", (85, 22), 0), "D4": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (94, 22), 0), "D6": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (105, 42), 90), "D7": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (108, 22), 0), "D5": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "GREEN LED", (109, 45), 90), "D8": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "RED LED", (107, 55), 90),
+        "C6": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D8.0mm_P3.50mm.kicad_mod", "Capacitor_THT", "220uF 35V", (72, 35), 0), "C8": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "47uF 35V", (95, 38), 0), "C9": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V", (98, 30), 90), "C11": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V (+ to GND)", (113, 45), 0), "C7": (KI_FOOTPRINTS / "Capacitor_THT.pretty/C_Disc_D5.0mm_W2.5mm_P2.50mm.kicad_mod", "Capacitor_THT", "470pF 50V C0G", (72, 50), 90),
     }
     for index, ref in enumerate(["TP1", "TP2", "TP3", "TP4"]):
         standard[ref] = (KI_FOOTPRINTS / "TestPoint.pretty/TestPoint_Pad_D2.0mm.kicad_mod", "TestPoint", {"TP1": "+5V", "TP2": "+13V8", "TP3": "-13V8", "TP4": "GND"}[ref], (10 + index * 10, 65), 0)

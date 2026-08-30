@@ -11,6 +11,7 @@ KiCad 9.0.1で開ける、銅箔配線前のキャリア基板ドラフトです
 - `pico_lta042b010f_carrier-kicad-native-reviewed.pdf` — KiCad純正のA4 PDF
 - `pico_lta042b010f_carrier-kicad-native-reviewed-preview.png` — 上記PDFをそのままラスタライズした確認画像
 - `pico_lta042b010f_carrier-pcb-3d-top.png` — KiCad純正PCB 3Dトップ表示
+- `pico_lta042b010f_carrier-bom.csv` — 秋月調達候補を含む、Ref単位のBOM
 - `pico_lta042b010f_carrier-reviewed-erc.txt` / `pico_lta042b010f_carrier-reviewed-drc.txt` — 検査結果
 - `pico_lta042b010f_carrier-junction-cleanup.txt` — 接続点整理ルールと結果
 
@@ -21,15 +22,21 @@ KiCad 9.0.1で開ける、銅箔配線前のキャリア基板ドラフトです
 | U1 | Raspberry Pi Pico 2W | `Module:RaspberryPi_Pico_W_SMD_HandSolder` |
 | J1 | LTA042B010F 36P FFC | `Connector_FFC-FPC:TE_3-1734839-6_1x36-1MP_P0.5mm_Horizontal` |
 | U3 | MC34063AD | `Package_SO:SOIC-8_3.9x4.9mm_P1.27mm` |
-| R7 | 0.47 Ω current sense | `Resistor_SMD:R_2512_6332Metric_Pad1.40x3.35mm_HandSolder` |
-| L1 | 150 µH | `Inductor_SMD:L_Sunlord_MWSA1204S-150` |
-| D4/D6/D7 | 1N5819 Schottky | `Diode_SMD:D_SMA` |
-| R8/R9/R10/R11/R16 | 0805抵抗 | `Resistor_SMD:R_0805_2012Metric` |
-| C7 | 470 pF | `Capacitor_SMD:C_0805_2012Metric` |
-| D5/D8 | LED | `LED_SMD:LED_0805_2012Metric` |
-| C6/C8/C9/C11 | 極性コンデンサ | `Capacitor_THT:CP_Radial_D5.0mm_P2.00mm` |
+| R7 | 0.47 Ω ±1%、1 W current sense、軸リード | `Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal` |
+| L1 | 100 µH、NR10050T101M | `Inductor_SMD:L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering` |
+| D4/D6/D7 | 1N5819 Schottky、DO-41 | `Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal` |
+| R8 | 200 Ω、0603/1608 | `Resistor_SMD:R_0603_1608Metric` |
+| R9/R11/R16 | 10 kΩ、±0.1%、0805/2012 | `Resistor_SMD:R_0805_2012Metric` |
+| R10 | 1 kΩ、±0.1%、0805/2012 | `Resistor_SMD:R_0805_2012Metric` |
+| C7 | 470 pF、50 V、C0G、2.5 mmピッチ | `Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm` |
+| D5/D8 | 緑／赤LED、2012/0805 | `LED_SMD:LED_0805_2012Metric` |
+| C6 | 220 µF、35 V、8 mm径、3.5 mmピッチ | `Capacitor_THT:CP_Radial_D8.0mm_P3.50mm` |
+| C8 | 47 µF、35 V、5 mm径、2.0 mmピッチ | `Capacitor_THT:CP_Radial_D5.0mm_P2.00mm` |
+| C9/C11 | 10 µF、50 V、5 mm径、2.0 mmピッチ | `Capacitor_THT:CP_Radial_D5.0mm_P2.00mm` |
 | RV1 | 10 kΩトリマ | `Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical` |
 | J2/J3 | 2P電源コネクタ | `Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical` |
+
+上表の部品は、指定された秋月品を優先し、残りも秋月で調達できる候補へ寄せています。抵抗・LEDは0603/0805を含みますが、手はんだ可能な範囲として選定しています。C6の指定品（秋月コード111758）は販売終了のため、BOMには指定品を残し、同寸法・同定格の現行候補コード102718を注記しています。J1はLCDモジュールそのものではなく基板側のTE製FFCコネクタであり、指定リンク内に対応するコネクタ品がないため、型番・接触面・ピン1方向の現物確認を残しています。
 
 Picoのフットプリントは、Raspberry Pi公式資料のPico W/Pico 2 W共通の40ピン・2.54 mm配置を前提に、KiCad公式フットプリントライブラリのSMD手はんだ版を採用しています。Pico 2 Wのアンテナ側は基板端から離して配置しています。FFCの接触面、ピン1方向、実際のケーブル型番は現物照合が必要です。
 
@@ -37,7 +44,7 @@ Picoのフットプリントは、Raspberry Pi公式資料のPico W/Pico 2 W共�
 
 - ERC: **エラー0、警告0**
 - 回路図ネットリスト: +5V、+13V8、-13V8、GND、Pico/LCD RGB・同期信号、MC34063周辺の接続を確認済み
-- PCB DRC: **未配線85件**。これは「アートワーク前」の状態によるものです。配置由来のコートヤード重なり、基板端クリアランス、文字高さは解消済みです。残る37件は、未配線以外ではシルク重なり／シルク下の銅箔警告18+8件と、KiCadライブラリ部品を基板ファイルへ展開した際の照合警告11件です。
+- PCB DRC: **未配線85件**。これは「アートワーク前」の状態によるものです。今回の部品置換後、配置由来のコートヤード重なり・基板端クリアランスは0件です。残る35件は、シルク重なり16件、シルク下の銅箔警告8件、KiCadライブラリ部品を基板ファイルへ展開した際の照合警告11件です。銅箔配線後にシルクと最終DRCを仕上げます。
 
 ## 回路図の接続点整理
 
@@ -72,6 +79,8 @@ U3は、SwEをGNDへ意図的に接続するこの回路でERCを成立させる
 - VCPP_ADJは10 kΩトリマで調整
 - 実機投入前に、ダイオード極性、電解コンデンサ極性、インダクタの飽和電流、+13.8 V/-13.8 Vの負荷時電圧・リップルを確認
 
+L1は元の150 µHから指定品の100 µHへ変更しています。これはフットプリントだけの置換ではなく昇圧回路の定数変更なので、実機では発振周波数・電流制限・出力電圧・インダクタ温度を再確認してください。
+
 PCB Editorで **Update PCB from Schematic (F8)** を実行し、現物に合わせて外形・コネクタ位置・Picoアンテナ周辺・電源／GND配線を確定した後、銅箔配線と最終DRCへ進みます。
 
 ## 参考資料
@@ -82,6 +91,12 @@ PCB Editorで **Update PCB from Schematic (F8)** を実行し、現物に合わ�
 - [KiCad公式Pico W SMD手はんだフットプリント](https://gitlab.com/kicad/libraries/kicad-footprints/-/blob/master/Module.pretty/RaspberryPi_Pico_W_SMD_HandSolder.kicad_mod?ref_type=heads)
 - [KiCad 9回路図エディターマニュアル](https://docs.kicad.org/9.0/ja/eeschema/eeschema.html)
 - [KiCad 9 CLIマニュアル](https://docs.kicad.org/9.0/en/cli/cli.html)
+- [秋月電子 NR10050T101M（コード108325）](https://akizukidenshi.com/catalog/g/g108325/)
+- [秋月電子 35ZLH220MEFCCT8X11.5（コード111758、販売終了）](https://akizukidenshi.com/catalog/g/g111758/)
+- [秋月電子 35PX47MEFC5X11（コード117887）](https://akizukidenshi.com/catalog/g/g117887/)
+- [秋月電子 1N5819（コード117244）](https://akizukidenshi.com/catalog/g/g117244/)
+- [秋月電子 MC34063AD（コード117573）](https://akizukidenshi.com/catalog/g/g117573/)
+- [秋月電子 Raspberry Pi Pico 2 W SC1633（コード130330）](https://akizukidenshi.com/catalog/g/g130330/)
 - [onsemi MC34063A公式データシート](https://www.onsemi.com/download/data-sheet/pdf/mc34063a-d.pdf)
 - [Diodes Incorporated 1N5819公式ページ](https://www.diodes.com/part/view/1N5819)
 - [pol: ESP32-S3で秋月300円液晶を動かす](https://pol.hateblo.jp/entry/2023/11/27/001524)

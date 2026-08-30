@@ -1,13 +1,13 @@
 ** Drc report for pico_lta042b010f_carrier.kicad_pcb **
-** Created on 2026-08-14T14:15:52+0900 **
+** Created on 2026-08-30T13:56:04+0900 **
 
-** Found 37 DRC violations **
+** Found 35 DRC violations **
 [lib_footprint_mismatch]: フットプリント 'RaspberryPi_Pico_W_SMD_HandSolder' が、ライブラリ 'Module' のコピーと一致しません。
     ローカル オーバーライド; warning
     @(56.0000 mm, 44.0000 mm): フットプリント U1
-[lib_footprint_mismatch]: フットプリント 'R_0805_2012Metric' が、ライブラリ 'Resistor_SMD' のコピーと一致しません。
+[lib_footprint_mismatch]: フットプリント 'R_0603_1608Metric' が、ライブラリ 'Resistor_SMD' のコピーと一致しません。
     ローカル オーバーライド; warning
-    @(78.0000 mm, 35.0000 mm): フットプリント R8
+    @(80.0000 mm, 35.0000 mm): フットプリント R8
 [lib_footprint_mismatch]: フットプリント 'R_0805_2012Metric' が、ライブラリ 'Resistor_SMD' のコピーと一致しません。
     ローカル オーバーライド; warning
     @(101.0000 mm, 35.0000 mm): フットプリント R9
@@ -20,7 +20,7 @@
 [lib_footprint_mismatch]: フットプリント 'R_0805_2012Metric' が、ライブラリ 'Resistor_SMD' のコピーと一致しません。
     ローカル オーバーライド; warning
     @(107.0000 mm, 63.0000 mm): フットプリント R16
-[lib_footprint_mismatch]: フットプリント 'D_SMA' が、ライブラリ 'Diode_SMD' のコピーと一致しません。
+[lib_footprint_mismatch]: フットプリント 'D_DO-41_SOD81_P10.16mm_Horizontal' が、ライブラリ 'Diode_THT' のコピーと一致しません。
     ローカル オーバーライド; warning
     @(105.0000 mm, 42.0000 mm): フットプリント D6
 [lib_footprint_mismatch]: フットプリント 'LED_0805_2012Metric' が、ライブラリ 'LED_SMD' のコピーと一致しません。
@@ -32,7 +32,7 @@
 [lib_footprint_mismatch]: フットプリント 'CP_Radial_D5.0mm_P2.00mm' が、ライブラリ 'Capacitor_THT' のコピーと一致しません。
     ローカル オーバーライド; warning
     @(98.0000 mm, 30.0000 mm): フットプリント C9
-[lib_footprint_mismatch]: フットプリント 'C_0805_2012Metric' が、ライブラリ 'Capacitor_SMD' のコピーと一致しません。
+[lib_footprint_mismatch]: フットプリント 'C_Disc_D5.0mm_W2.5mm_P2.50mm' が、ライブラリ 'Capacitor_THT' のコピーと一致しません。
     ローカル オーバーライド; warning
     @(72.0000 mm, 50.0000 mm): フットプリント C7
 [silk_over_copper]: ハンダマスクでシルクスクリーンが切り取られている
@@ -65,12 +65,16 @@
     @(20.0000 mm, 5.5000 mm): 基板上のテキスト 'FFC 36P 0.5mm: CONTACT SIDE / PIN 1 MUST BE VERIFIED' ( f.silkscreen 上)
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(100.2650 mm, 35.2271 mm): セグメント of R9 、f.silkscreen 上
-    @(99.3500 mm, 35.0000 mm): R9のリファレンスフィールド
+    @(73.7500 mm, 35.0000 mm): 円 of C6 、f.silkscreen 上
+    @(78.5700 mm, 35.0000 mm): R8のリファレンスフィールド
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(108.2650 mm, 35.2271 mm): セグメント of R11 、f.silkscreen 上
-    @(107.3500 mm, 35.0000 mm): R11のリファレンスフィールド
+    @(77.7100 mm, 33.9030 mm): セグメント of C6 、f.silkscreen 上
+    @(78.5700 mm, 35.0000 mm): R8のリファレンスフィールド
+[silk_overlap]: シルクスクリーンのオーバーラップ
+    ルール: board setup constraints silk; warning
+    @(77.7500 mm, 34.0530 mm): セグメント of C6 、f.silkscreen 上
+    @(78.5700 mm, 35.0000 mm): R8のリファレンスフィールド
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
     @(105.3500 mm, 63.0000 mm): R16のリファレンスフィールド
@@ -93,44 +97,32 @@
     @(105.3500 mm, 55.0000 mm): D8のリファレンスフィールド
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(76.3500 mm, 35.0000 mm): R8のリファレンスフィールド
-    @(75.6000 mm, 34.7170 mm): セグメント of C6 、f.silkscreen 上
+    @(99.3500 mm, 35.0000 mm): R9のリファレンスフィールド
+    @(100.2650 mm, 35.2271 mm): セグメント of R9 、f.silkscreen 上
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(76.3500 mm, 35.0000 mm): R8のリファレンスフィールド
-    @(73.0000 mm, 35.0000 mm): 円 of C6 、f.silkscreen 上
+    @(110.3600 mm, 23.4700 mm): セグメント of D7 、f.silkscreen 上
+    @(107.3500 mm, 35.0000 mm): R11のリファレンスフィールド
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(76.3500 mm, 35.0000 mm): R8のリファレンスフィールド
-    @(75.4800 mm, 34.1950 mm): セグメント of C6 、f.silkscreen 上
+    @(108.2650 mm, 35.2271 mm): セグメント of R11 、f.silkscreen 上
+    @(107.3500 mm, 35.0000 mm): R11のリファレンスフィールド
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(75.5200 mm, 34.3230 mm): セグメント of C6 、f.silkscreen 上
-    @(76.3500 mm, 35.0000 mm): R8のリファレンスフィールド
+    @(77.7900 mm, 34.2320 mm): セグメント of C6 、f.silkscreen 上
+    @(78.5700 mm, 35.0000 mm): R8のリファレンスフィールド
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(76.3500 mm, 35.0000 mm): R8のリファレンスフィールド
-    @(75.5600 mm, 34.4830 mm): セグメント of C6 、f.silkscreen 上
+    @(78.5700 mm, 35.0000 mm): R8のリファレンスフィールド
+    @(77.8300 mm, 34.4670 mm): セグメント of C6 、f.silkscreen 上
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(76.3500 mm, 35.0000 mm): R8のリファレンスフィールド
-    @(77.2650 mm, 35.2271 mm): セグメント of R8 、f.silkscreen 上
+    @(79.4775 mm, 35.2373 mm): セグメント of R8 、f.silkscreen 上
+    @(78.5700 mm, 35.0000 mm): R8のリファレンスフィールド
 [silk_overlap]: シルクスクリーンのオーバーラップ
     ルール: board setup constraints silk; warning
-    @(106.4900 mm, 20.3500 mm): セグメント of D7 、f.silkscreen 上
-    @(110.0000 mm, 19.5000 mm): D7のリファレンスフィールド
-[silk_overlap]: シルクスクリーンのオーバーラップ
-    ルール: board setup constraints silk; warning
-    @(107.3500 mm, 45.0000 mm): D5のリファレンスフィールド
-    @(106.4900 mm, 20.3500 mm): セグメント of D7 、f.silkscreen 上
-[silk_overlap]: シルクスクリーンのオーバーラップ
-    ルール: board setup constraints silk; warning
-    @(107.3500 mm, 45.0000 mm): D5のリファレンスフィールド
-    @(106.4900 mm, 23.6500 mm): セグメント of D7 、f.silkscreen 上
-[silk_overlap]: シルクスクリーンのオーバーラップ
-    ルール: board setup constraints silk; warning
-    @(107.3500 mm, 45.0000 mm): D5のリファレンスフィールド
     @(108.0400 mm, 44.0000 mm): セグメント of D5 、f.silkscreen 上
+    @(107.3500 mm, 45.0000 mm): D5のリファレンスフィールド
 
 ** Found 85 unconnected pads **
 [unconnected_items]: アイテム間の接続が見つからない
@@ -139,12 +131,12 @@
     @(13.7500 mm, 7.6500 mm): パッド 6 [GND] - J1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(28.7500 mm, 7.6500 mm): パッド 36 [GND] - J1 ( F.Cu 上)
-    @(27.7500 mm, 7.6500 mm): パッド 34 [GND] - J1 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
     @(27.7500 mm, 7.6500 mm): パッド 34 [GND] - J1 ( F.Cu 上)
     @(26.7500 mm, 7.6500 mm): パッド 32 [GND] - J1 ( F.Cu 上)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
+    @(28.7500 mm, 7.6500 mm): パッド 36 [GND] - J1 ( F.Cu 上)
+    @(27.7500 mm, 7.6500 mm): パッド 34 [GND] - J1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(12.2500 mm, 7.6500 mm): パッド 3 [GND] - J1 ( F.Cu 上)
@@ -171,24 +163,28 @@
     @(113.0000 mm, 45.0000 mm): PTHパッド 1 [GND] (C11)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(108.0000 mm, 22.0000 mm): パッド 1 [-13V8] - D7 ( F.Cu 上)
+    @(108.0000 mm, 22.0000 mm): PTHパッド 1 [-13V8] (D7)
     @(109.0000 mm, 45.9375 mm): パッド 1 [GND] - D5 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
+    @(108.0000 mm, 22.0000 mm): PTHパッド 1 [-13V8] (D7)
     @(101.0000 mm, 47.0875 mm): パッド 2 [GND] - R10 ( F.Cu 上)
-    @(108.0000 mm, 22.0000 mm): パッド 1 [-13V8] - D7 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(72.0000 mm, 49.0500 mm): パッド 2 [GND] - C7 ( F.Cu 上)
-    @(65.6900 mm, 50.3500 mm): パッド 28 [GND] - U1 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
-    @(46.3100 mm, 63.0500 mm): パッド 18 [GND] - U1 ( F.Cu 上)
     @(40.0000 mm, 65.0000 mm): パッド 1 [GND] - TP4 ( F.Cu 上)
+    @(46.3100 mm, 63.0500 mm): パッド 18 [GND] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(105.0000 mm, 17.5400 mm): PTHパッド 2 [GND] (J3)
+    @(65.6900 mm, 50.3500 mm): パッド 28 [GND] - U1 ( F.Cu 上)
+    @(72.0000 mm, 47.5000 mm): PTHパッド 2 [GND] (C7)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
     @(105.0000 mm, 10.5400 mm): PTHパッド 2 [GND] (J2)
+    @(105.0000 mm, 17.5400 mm): PTHパッド 2 [GND] (J3)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
+    @(75.5000 mm, 35.0000 mm): PTHパッド 2 [GND] (C6)
+    @(82.5250 mm, 34.3650 mm): パッド 2 [GND] - U3 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(65.6900 mm, 63.0500 mm): パッド 23 [GND] - U1 ( F.Cu 上)
@@ -199,75 +195,71 @@
     @(17.7500 mm, 7.6500 mm): パッド 14 [GND] - J1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(82.5250 mm, 34.3650 mm): パッド 2 [GND] - U3 ( F.Cu 上)
-    @(74.0000 mm, 35.0000 mm): PTHパッド 2 [GND] (C6)
+    @(97.0000 mm, 38.0000 mm): PTHパッド 2 [GND] (C8)
+    @(108.0000 mm, 22.0000 mm): PTHパッド 1 [-13V8] (D7)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(65.6900 mm, 37.6500 mm): パッド 33 [GND] - U1 ( F.Cu 上)
-    @(74.0000 mm, 35.0000 mm): PTHパッド 2 [GND] (C6)
+    @(75.5000 mm, 35.0000 mm): PTHパッド 2 [GND] (C6)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(101.0000 mm, 47.0875 mm): パッド 2 [GND] - R10 ( F.Cu 上)
-    @(97.0000 mm, 38.0000 mm): PTHパッド 2 [GND] (C8)
+    @(72.0000 mm, 47.5000 mm): PTHパッド 2 [GND] (C7)
+    @(65.6900 mm, 37.6500 mm): パッド 33 [GND] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(72.0000 mm, 49.0500 mm): パッド 2 [GND] - C7 ( F.Cu 上)
+    @(65.6900 mm, 50.3500 mm): パッド 28 [GND] - U1 ( F.Cu 上)
     @(72.9200 mm, 60.0000 mm): PTHパッド 3 [GND] (RV1)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
+    @(46.3100 mm, 24.9500 mm): パッド 3 [GND] - U1 ( F.Cu 上)
+    @(46.3100 mm, 37.6500 mm): パッド 8 [GND] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(46.3100 mm, 50.3500 mm): パッド 13 [GND] - U1 ( F.Cu 上)
     @(46.3100 mm, 63.0500 mm): パッド 18 [GND] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
+    @(65.6900 mm, 37.6500 mm): パッド 33 [GND] - U1 ( F.Cu 上)
     @(65.6900 mm, 24.9500 mm): パッド 38 [GND] - U1 ( F.Cu 上)
-    @(65.6900 mm, 37.6500 mm): パッド 33 [GND] - U1 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
-    @(46.3100 mm, 37.6500 mm): パッド 8 [GND] - U1 ( F.Cu 上)
-    @(46.3100 mm, 24.9500 mm): パッド 3 [GND] - U1 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
-    @(65.6900 mm, 37.6500 mm): パッド 33 [GND] - U1 ( F.Cu 上)
-    @(65.6900 mm, 50.3500 mm): パッド 28 [GND] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(46.3100 mm, 50.3500 mm): パッド 13 [GND] - U1 ( F.Cu 上)
     @(46.3100 mm, 37.6500 mm): パッド 8 [GND] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(82.5250 mm, 36.9050 mm): パッド 4 [GND] - U3 ( F.Cu 上)
     @(97.0000 mm, 38.0000 mm): PTHパッド 2 [GND] (C8)
+    @(82.5250 mm, 36.9050 mm): パッド 4 [GND] - U3 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(107.0000 mm, 62.0875 mm): パッド 2 [GND] - R16 ( F.Cu 上)
     @(101.0000 mm, 47.0875 mm): パッド 2 [GND] - R10 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(46.3100 mm, 63.0500 mm): パッド 18 [GND] - U1 ( F.Cu 上)
     @(65.6900 mm, 63.0500 mm): パッド 23 [GND] - U1 ( F.Cu 上)
+    @(46.3100 mm, 63.0500 mm): パッド 18 [GND] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(97.0000 mm, 38.0000 mm): PTHパッド 2 [GND] (C8)
     @(105.0000 mm, 17.5400 mm): PTHパッド 2 [GND] (J3)
+    @(97.0000 mm, 38.0000 mm): PTHパッド 2 [GND] (C8)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(28.7500 mm, 7.6500 mm): パッド 36 [GND] - J1 ( F.Cu 上)
     @(46.3100 mm, 24.9500 mm): パッド 3 [GND] - U1 ( F.Cu 上)
+    @(28.7500 mm, 7.6500 mm): パッド 36 [GND] - J1 ( F.Cu 上)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
+    @(87.4750 mm, 35.6350 mm): パッド 6 [+5V] - U3 ( F.Cu 上)
+    @(80.0000 mm, 35.8250 mm): パッド 1 [+5V] - R8 ( F.Cu 上)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
+    @(80.0000 mm, 35.8250 mm): パッド 1 [+5V] - R8 ( F.Cu 上)
+    @(72.0000 mm, 35.0000 mm): PTHパッド 1 [+5V] (C6)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
+    @(72.0000 mm, 12.0000 mm): PTHパッド 1 [+5V] (R7)
+    @(65.6900 mm, 19.8700 mm): パッド 40 [+5V] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(65.6900 mm, 19.8700 mm): パッド 40 [+5V] - U1 ( F.Cu 上)
-    @(68.9500 mm, 22.0000 mm): パッド 1 [+5V] - R7 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
-    @(72.0000 mm, 35.0000 mm): PTHパッド 1 [+5V] (C6)
-    @(78.0000 mm, 35.9125 mm): パッド 1 [+5V] - R8 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
-    @(78.0000 mm, 35.9125 mm): パッド 1 [+5V] - R8 ( F.Cu 上)
-    @(87.4750 mm, 35.6350 mm): パッド 6 [+5V] - U3 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
-    @(68.9500 mm, 22.0000 mm): パッド 1 [+5V] - R7 ( F.Cu 上)
     @(72.0000 mm, 35.0000 mm): PTHパッド 1 [+5V] (C6)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
@@ -275,8 +267,8 @@
     @(105.0000 mm, 8.0000 mm): PTHパッド 1 [+5V] (J2)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(65.6900 mm, 19.8700 mm): パッド 40 [+5V] - U1 ( F.Cu 上)
     @(26.2500 mm, 7.6500 mm): パッド 31 [+5V] - J1 ( F.Cu 上)
+    @(65.6900 mm, 19.8700 mm): パッド 40 [+5V] - U1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(26.2500 mm, 7.6500 mm): パッド 31 [+5V] - J1 ( F.Cu 上)
@@ -295,12 +287,12 @@
     @(101.0000 mm, 35.9125 mm): パッド 1 [+13V8] - R9 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(108.0000 mm, 22.0000 mm): パッド 1 [-13V8] - D7 ( F.Cu 上)
+    @(108.0000 mm, 22.0000 mm): PTHパッド 1 [-13V8] (D7)
     @(98.0000 mm, 30.0000 mm): PTHパッド 1 [+13V8] (C9)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(105.0000 mm, 15.0000 mm): PTHパッド 1 [+13V8] (J3)
-    @(108.0000 mm, 22.0000 mm): パッド 1 [-13V8] - D7 ( F.Cu 上)
+    @(108.0000 mm, 22.0000 mm): PTHパッド 1 [-13V8] (D7)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(28.2500 mm, 7.6500 mm): パッド 35 [+13V8] - J1 ( F.Cu 上)
@@ -308,7 +300,7 @@
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(28.2500 mm, 7.6500 mm): パッド 35 [+13V8] - J1 ( F.Cu 上)
-    @(108.0000 mm, 22.0000 mm): パッド 1 [-13V8] - D7 ( F.Cu 上)
+    @(108.0000 mm, 22.0000 mm): PTHパッド 1 [-13V8] (D7)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(107.0000 mm, 55.9375 mm): パッド 1 [-13V8] - D8 ( F.Cu 上)
@@ -316,7 +308,7 @@
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(115.0000 mm, 45.0000 mm): PTHパッド 2 [-13V8] (C11)
-    @(108.0000 mm, 22.0000 mm): パッド 1 [-13V8] - D7 ( F.Cu 上)
+    @(108.0000 mm, 22.0000 mm): PTHパッド 1 [-13V8] (D7)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(27.2500 mm, 7.6500 mm): パッド 33 [-13V8] - J1 ( F.Cu 上)
@@ -427,27 +419,27 @@
     @(75.4600 mm, 60.0000 mm): PTHパッド 2 [VCPP_ADJ] (RV1)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(79.3750 mm, 22.0000 mm): パッド 1 [IPK_SENSE] - L1 ( F.Cu 上)
-    @(75.0500 mm, 22.0000 mm): パッド 2 [IPK_SENSE] - R7 ( F.Cu 上)
+    @(82.1600 mm, 12.0000 mm): PTHパッド 2 [IPK_SENSE] (R7)
+    @(80.3000 mm, 22.0000 mm): パッド 1 [IPK_SENSE] - L1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
+    @(80.3000 mm, 22.0000 mm): パッド 1 [IPK_SENSE] - L1 ( F.Cu 上)
     @(87.4750 mm, 34.3650 mm): パッド 7 [IPK_SENSE] - U3 ( F.Cu 上)
-    @(79.3750 mm, 22.0000 mm): パッド 1 [IPK_SENSE] - L1 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(78.0000 mm, 34.0875 mm): パッド 2 [DRIVER_DC] - R8 ( F.Cu 上)
+    @(80.0000 mm, 34.1750 mm): パッド 2 [DRIVER_DC] - R8 ( F.Cu 上)
     @(87.4750 mm, 33.0950 mm): パッド 8 [DRIVER_DC] - U3 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(112.0000 mm, 22.0000 mm): パッド 2 [CPUMP_MID] - D7 ( F.Cu 上)
-    @(90.6250 mm, 22.0000 mm): パッド 2 [SW_NODE] - L1 ( F.Cu 上)
-[unconnected_items]: アイテム間の接続が見つからない
-    ローカル オーバーライド; error
-    @(90.6250 mm, 22.0000 mm): パッド 2 [SW_NODE] - L1 ( F.Cu 上)
+    @(89.7000 mm, 22.0000 mm): パッド 2 [SW_NODE] - L1 ( F.Cu 上)
     @(82.5250 mm, 33.0950 mm): パッド 1 [SW_NODE] - U3 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(72.0000 mm, 50.9500 mm): パッド 1 [TC_TIMING] - C7 ( F.Cu 上)
+    @(118.1600 mm, 22.0000 mm): PTHパッド 2 [CPUMP_MID] (D7)
+    @(89.7000 mm, 22.0000 mm): パッド 2 [SW_NODE] - L1 ( F.Cu 上)
+[unconnected_items]: アイテム間の接続が見つからない
+    ローカル オーバーライド; error
+    @(72.0000 mm, 50.0000 mm): PTHパッド 1 [TC_TIMING] (C7)
     @(82.5250 mm, 35.6350 mm): パッド 3 [TC_TIMING] - U3 ( F.Cu 上)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
@@ -464,11 +456,11 @@
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(98.0000 mm, 28.0000 mm): PTHパッド 2 [CPUMP_MID] (C9)
-    @(112.0000 mm, 22.0000 mm): パッド 2 [CPUMP_MID] - D7 ( F.Cu 上)
+    @(118.1600 mm, 22.0000 mm): PTHパッド 2 [CPUMP_MID] (D7)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
-    @(112.0000 mm, 22.0000 mm): パッド 2 [CPUMP_MID] - D7 ( F.Cu 上)
-    @(98.0000 mm, 28.0000 mm): PTHパッド 2 [CPUMP_MID] (C9)
+    @(118.1600 mm, 22.0000 mm): PTHパッド 2 [CPUMP_MID] (D7)
+    @(118.1600 mm, 22.0000 mm): PTHパッド 2 [CPUMP_MID] (D7)
 [unconnected_items]: アイテム間の接続が見つからない
     ローカル オーバーライド; error
     @(107.0000 mm, 54.0625 mm): パッド 2 [NEG_LED_N] - D8 ( F.Cu 上)
