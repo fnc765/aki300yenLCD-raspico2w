@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import math
 import re
+import sys
 import uuid
+import heapq
+from array import array
 from pathlib import Path
 
 
@@ -103,43 +106,43 @@ AKIZUKI_COMPONENT_FIELDS: dict[str, dict[str, str]] = {
     },
     "R8": {
         "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
-        "MPN": "RC0603J200R",
-        "AkizukiCode": "131855",
+        "MPN": "MFS25F200RB",
+        "AkizukiCode": "108526",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g131855/",
-        "SelectionNote": "200ohm +/-5%; 0.1W; 0603/1608 SMD; hand-solderable",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g108526/",
+        "SelectionNote": "200ohm +/-1%; 1/4W; compact axial through-hole; horizontal mounting",
     },
     "R9": {
-        "Manufacturer": "SUSUMU / SSM",
-        "MPN": "RG2012-N-103-B-T5",
-        "AkizukiCode": "111797",
+        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
+        "MPN": "MF25B10KBD",
+        "AkizukiCode": "116877",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g111797/",
-        "SelectionNote": "10kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g116877/",
+        "SelectionNote": "10kohm +/-0.1%; 1/4W; axial through-hole; horizontal mounting",
     },
     "R10": {
-        "Manufacturer": "SUSUMU / SSM",
-        "MPN": "RG2012N-102-B-T5",
-        "AkizukiCode": "111796",
+        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
+        "MPN": "MF25B1KBD",
+        "AkizukiCode": "116876",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g111796/",
-        "SelectionNote": "1kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g116876/",
+        "SelectionNote": "1kohm +/-0.1%; 1/4W; axial through-hole; horizontal mounting",
     },
     "R11": {
-        "Manufacturer": "SUSUMU / SSM",
-        "MPN": "RG2012-N-103-B-T5",
-        "AkizukiCode": "111797",
+        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
+        "MPN": "MF25B10KBD",
+        "AkizukiCode": "116877",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g111797/",
-        "SelectionNote": "10kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g116877/",
+        "SelectionNote": "10kohm +/-0.1%; 1/4W; axial through-hole; horizontal mounting",
     },
     "R16": {
-        "Manufacturer": "SUSUMU / SSM",
-        "MPN": "RG2012-N-103-B-T5",
-        "AkizukiCode": "111797",
+        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
+        "MPN": "MF25B10KBD",
+        "AkizukiCode": "116877",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g111797/",
-        "SelectionNote": "10kohm +/-0.1%; 1/8W; 0805/2012 SMD; hand-solderable",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g116877/",
+        "SelectionNote": "10kohm +/-0.1%; 1/4W; axial through-hole; horizontal mounting",
     },
     "L1": {
         "Manufacturer": "Taiyo Yuden",
@@ -230,12 +233,12 @@ AKIZUKI_COMPONENT_FIELDS: dict[str, dict[str, str]] = {
         "SelectionNote": "red LED; 2012/0805 SMD; hand-solderable",
     },
     "RV1": {
-        "Manufacturer": "Bourns",
-        "MPN": "3296W-1-103LF",
-        "AkizukiCode": "100975",
+        "Manufacturer": "SUNTAN TECHNOLOGY CO LTD",
+        "MPN": "TSR-065-103-R",
+        "AkizukiCode": "106063",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g100975/",
-        "SelectionNote": "10kohm vertical multiturn trimmer; through-hole",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g106063/",
+        "SelectionNote": "10kohm +/-30%; 0.1W; top-adjust single-turn trimmer; RM-065 through-hole footprint",
     },
     "J2": {
         "Manufacturer": "Chang Enn",
@@ -808,7 +811,635 @@ def make_footprint(
     footprint = footprint[:layer_end.end()] + f'\n\t(at {fmt(position[0])} {fmt(position[1])} {fmt(rotation)})' + footprint[layer_end.end():]
     footprint = re.sub(r'(\(property "Reference" )"[^"]+"', rf'\1"{reference}"', footprint, count=1)
     footprint = re.sub(r'(\(property "Value" )"[^"]+"', rf'\1"{value}"', footprint, count=1)
+    # Library footprints carry UUIDs that are unique only inside the library
+    # file.  Cloning those UUIDs into several board footprints makes KiCad DRC
+    # associate a pad or courtyard with the wrong instance.  Derive stable,
+    # per-reference UUIDs for every cloned primitive instead.
+    def clone_uuid(match: re.Match[str]) -> str:
+        cloned = uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"pico-footprint-{reference}-{match.group(1)}",
+        )
+        return f'(uuid "{cloned}")'
+
+    footprint = re.sub(r'\(uuid "([^"]+)"\)', clone_uuid, footprint)
+    # Embedded library keepouts use footprint-local coordinates.  A footprint
+    # copied into a board does not apply its placement to those polygon points
+    # automatically, so translate the points while preserving the keepout.
+    cursor = 0
+    while True:
+        zone_match = re.search(r'^\t\(zone\b', footprint[cursor:], re.MULTILINE)
+        if not zone_match:
+            break
+        zone_start = cursor + zone_match.start()
+        zone_end = find_balanced(footprint, zone_start + 1)
+        zone = footprint[zone_start:zone_end]
+
+        # This library polygon describes the Pico RF extension below the
+        # module. With the present board orientation it is wholly outside
+        # the 69.4 mm board edge. Keeping an off-board polygon in the board
+        # file causes false pad/keepout DRC errors at the edge without adding
+        # any in-board protection; the actual in-board antenna keepout below
+        # is retained.
+        zone_name = re.search(r'\(name "([^"]*)"\)', zone)
+        if zone_name and zone_name.group(1) == "RF Copper Keep Out":
+            # Preserve the RF restriction for tracks/vias/copper pour. The
+            # library polygon also overlaps two no-net mechanical pads at the
+            # module edge; pads are intentionally allowed there because they
+            # are not an antenna copper escape.
+            zone = zone.replace("(pads not_allowed)", "(pads allowed)")
+        if zone_name and zone_name.group(1) == "RF Copper Keep Out":
+            raw_points = [
+                (float(x), float(y))
+                for x, y in re.findall(r'\(xy\s+([^ )]+)\s+([^ )]+)\)', zone)
+            ]
+            translated_y = []
+            for x, y in raw_points:
+                _, ry = ArtworkRouter._rotate(x, y, rotation)
+                translated_y.append(position[1] + ry)
+            if translated_y and min(translated_y) >= 69.4:
+                footprint = footprint[:zone_start] + footprint[zone_end:]
+                continue
+
+        def translate_zone_point(match: re.Match[str]) -> str:
+            x, y = float(match.group(1)), float(match.group(2))
+            rx, ry = ArtworkRouter._rotate(x, y, rotation)
+            return f'(xy {fmt(position[0] + rx)} {fmt(position[1] + ry)})'
+
+        zone = re.sub(r'\(xy\s+([^ )]+)\s+([^ )]+)\)', translate_zone_point, zone)
+        footprint = footprint[:zone_start] + zone + footprint[zone_end:]
+        cursor = zone_start + len(zone)
     return annotate_footprint(footprint, nets)
+
+
+def artwork_uid(kind: str, index: int) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"pico-artwork-{kind}-{index}"))
+
+
+def parse_routing_pads(footprints: list[str]) -> list[dict[str, object]]:
+    """Extract absolute pad centers and copper geometry from rendered footprints.
+
+    The artwork generator deliberately works from the same rendered footprint
+    text that is written into the board.  That keeps routing endpoints tied to
+    the actual KiCad library geometry instead of duplicating pad coordinates in
+    a second hand-maintained table.
+    """
+    pads: list[dict[str, object]] = []
+    for block in footprints:
+        ref_match = re.search(r'\(property "Reference" "([^"]+)"', block)
+        at_match = re.search(r'\n\s*\(at ([^ )]+) ([^ )]+)(?: ([^ )]+))?\)', block)
+        if not ref_match or not at_match:
+            continue
+        ref = ref_match.group(1)
+        fx, fy, frot = float(at_match.group(1)), float(at_match.group(2)), float(at_match.group(3) or 0)
+        for _, _, pad in parse_pad_blocks(block):
+            name_match = re.search(r'\(pad "([^"]*)"', pad)
+            pad_at = re.search(r'\(at ([^ )]+) ([^ )]+)(?: ([^ )]+))?\)', pad)
+            size_match = re.search(r'\(size ([^ )]+) ([^ )]+)\)', pad)
+            if not name_match or not pad_at or not size_match:
+                continue
+            net_match = re.search(r'\(net (\d+) "([^"]*)"\)', pad)
+            layers_match = re.search(r'\(layers ([^\)]*)\)', pad, re.S)
+            if not layers_match:
+                continue
+            px, py, prot = float(pad_at.group(1)), float(pad_at.group(2)), float(pad_at.group(3) or 0)
+            sx, sy = float(size_match.group(1)), float(size_match.group(2))
+            fangle = math.radians(-frot)
+            gx = fx + px * math.cos(fangle) - py * math.sin(fangle)
+            gy = fy + px * math.sin(fangle) + py * math.cos(fangle)
+            layers_text = layers_match.group(1)
+            layers = set(re.findall(r'"([^"]+)"', layers_text))
+            if "*.Cu" in layers:
+                copper_layers = {"F.Cu", "B.Cu"}
+            else:
+                copper_layers = {layer for layer in ("F.Cu", "B.Cu") if layer in layers}
+            pads.append(
+                {
+                    "ref": ref,
+                    "pad": name_match.group(1),
+                    "x": gx,
+                    "y": gy,
+                    "size_x": sx,
+                    "size_y": sy,
+                    "angle": frot + prot,
+                    "layers": copper_layers,
+                    "net_num": int(net_match.group(1)) if net_match else 0,
+                    "net": net_match.group(2) if net_match else "",
+                    "through": "thru_hole" in pad,
+                }
+            )
+    return pads
+
+
+def parse_footprint_keepouts(footprints: list[str]) -> list[tuple[str, list[tuple[float, float]], tuple[int, ...]]]:
+    """Read translated copper keepout polygons embedded in footprints."""
+    keepouts: list[tuple[str, list[tuple[float, float]], tuple[int, ...]]] = []
+    for block in footprints:
+        cursor = 0
+        while True:
+            zone_match = re.search(r'^\t\(zone\b', block[cursor:], re.MULTILINE)
+            if not zone_match:
+                break
+            zone_start = cursor + zone_match.start()
+            zone_end = find_balanced(block, zone_start + 1)
+            zone = block[zone_start:zone_end]
+            cursor = zone_end
+            if "(keepout" not in zone:
+                continue
+            name_match = re.search(r'\(name "([^"]*)"\)', zone)
+            points = [(float(x), float(y)) for x, y in re.findall(r'\(xy\s+([^ )]+)\s+([^ )]+)\)', zone)]
+            if len(points) < 3:
+                continue
+            layers: set[int] = set()
+            layers_match = re.search(r'\(layers\s+([^\)]*)\)', zone, re.S)
+            if layers_match:
+                layer_names = set(re.findall(r'"([^"]+)"', layers_match.group(1)))
+                if "F.Cu" in layer_names or "*.Cu" in layer_names:
+                    layers.add(0)
+                if "B.Cu" in layer_names or "*.Cu" in layer_names:
+                    layers.add(1)
+            if layers:
+                keepouts.append((name_match.group(1) if name_match else "embedded keepout", points, tuple(sorted(layers))))
+    return keepouts
+
+
+class ArtworkRouter:
+    """Conservative deterministic two-layer router for this carrier board."""
+
+    GRID = 0.25
+    WIDTH = 481
+    HEIGHT = 281
+    CELLS = WIDTH * HEIGHT
+    # Match the board's fabrication constraints: standard through vias are
+    # 0.5 mm diameter with a 0.3 mm drill.  They are placed after the FFC
+    # escape, never directly in the 0.5 mm contact pitch.
+    VIA_DIAMETER = 0.5
+    VIA_DRILL = 0.3
+    STATIC_MARGIN = 0.5
+    # A 0.25 mm routing grid can otherwise let a second route pass through a
+    # neighbouring cell corner even though the resulting copper is inside
+    # KiCad's 0.20 mm clearance. Keep one extra grid cell as a safety margin.
+    # Keep the router's clearance model exact at the connector escape.  The
+    # 0.5 mm pitch leaves 0.3 mm edge-to-edge between 0.2 mm traces, already
+    # above the board's 0.2 mm clearance rule; an extra grid-cell margin would
+    # incorrectly treat adjacent legal escapes as blocked.
+    TRACK_SAFETY_MARGIN = 0.0
+    TRACK_OBSTACLE_RADIUS = 0.75
+
+    def __init__(
+        self,
+        pads: list[dict[str, object]],
+        net_numbers: dict[str, int],
+        keepouts: list[tuple[str, list[tuple[float, float]], tuple[int, ...]]] | None = None,
+    ) -> None:
+        self.pads = pads
+        self.net_numbers = net_numbers
+        self.pad_blocked = [bytearray(self.CELLS), bytearray(self.CELLS)]
+        self.via_blocked = [bytearray(self.CELLS), bytearray(self.CELLS)]
+        self.keepout = [bytearray(self.CELLS), bytearray(self.CELLS)]
+        self.track_owner = [array("i", [0]) * self.CELLS, array("i", [0]) * self.CELLS]
+        self.own_pad_cells: dict[str, list[set[int]]] = {}
+        self.objects: list[str] = []
+        self.segment_count = 0
+        self.via_count = 0
+        for pad in pads:
+            self._mark_pad(pad)
+        # The Pico 2 W antenna is at the lower end of this board orientation.
+        # Keep both copper layers clear in the antenna envelope.
+        self.mark_keepout(48.5, 61.5, 63.5, 69.5, (0, 1))
+        for _, points, layers in keepouts or []:
+            self.mark_polygon_keepout(points, layers)
+
+    def _index(self, ix: int, iy: int) -> int:
+        return iy * self.WIDTH + ix
+
+    def _grid(self, value: float) -> int:
+        return max(0, min(self.WIDTH - 1, int(round(value / self.GRID))))
+
+    @staticmethod
+    def _rotate(x: float, y: float, angle: float) -> tuple[float, float]:
+        # KiCad's board coordinates use positive Y down, so a positive
+        # footprint rotation is clockwise in the file's Cartesian transform.
+        a = math.radians(-angle)
+        return x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a)
+
+    def _inside_pad(self, pad: dict[str, object], x: float, y: float, margin: float) -> bool:
+        dx = x - float(pad["x"])
+        dy = y - float(pad["y"])
+        lx, ly = self._rotate(dx, dy, float(pad["angle"]))
+        return (
+            abs(lx) <= float(pad["size_x"]) / 2 + margin
+            and abs(ly) <= float(pad["size_y"]) / 2 + margin
+        )
+
+    def _mark_pad(self, pad: dict[str, object]) -> None:
+        sx, sy = float(pad["size_x"]), float(pad["size_y"])
+        radius = math.hypot(sx, sy) / 2 + self.STATIC_MARGIN
+        x, y = float(pad["x"]), float(pad["y"])
+        xmin, xmax = self._grid(x - radius), self._grid(x + radius)
+        ymin, ymax = max(0, self._grid(y - radius)), min(self.HEIGHT - 1, self._grid(y + radius))
+        net = str(pad["net"])
+        if net:
+            self.own_pad_cells.setdefault(net, [set(), set()])
+        for iy in range(ymin, ymax + 1):
+            for ix in range(xmin, xmax + 1):
+                gx, gy = ix * self.GRID, iy * self.GRID
+                if not self._inside_pad(pad, gx, gy, self.STATIC_MARGIN):
+                    continue
+                idx = self._index(ix, iy)
+                if net:
+                    for layer in (0, 1):
+                        self.own_pad_cells[net][layer].add(idx)
+                layers = pad["layers"]
+                if "F.Cu" in layers:
+                    self.pad_blocked[0][idx] = 1
+                if "B.Cu" in layers:
+                    self.pad_blocked[1][idx] = 1
+                if bool(pad["through"]):
+                    self.via_blocked[0][idx] = 1
+                    self.via_blocked[1][idx] = 1
+                elif "F.Cu" in layers:
+                    self.via_blocked[0][idx] = 1
+
+    def mark_keepout(self, xmin: float, ymin: float, xmax: float, ymax: float, layers: tuple[int, ...]) -> None:
+        for iy in range(max(0, self._grid(ymin)), min(self.HEIGHT - 1, self._grid(ymax)) + 1):
+            for ix in range(max(0, self._grid(xmin)), min(self.WIDTH - 1, self._grid(xmax)) + 1):
+                x, y = ix * self.GRID, iy * self.GRID
+                if xmin <= x <= xmax and ymin <= y <= ymax:
+                    idx = self._index(ix, iy)
+                    for layer in layers:
+                        self.keepout[layer][idx] = 1
+                        self.via_blocked[layer][idx] = 1
+
+    def mark_polygon_keepout(self, points: list[tuple[float, float]], layers: tuple[int, ...]) -> None:
+        xmin = max(0, self._grid(min(x for x, _ in points)))
+        xmax = min(self.WIDTH - 1, self._grid(max(x for x, _ in points)))
+        ymin = max(0, self._grid(min(y for _, y in points)))
+        ymax = min(self.HEIGHT - 1, self._grid(max(y for _, y in points)))
+
+        def inside(x: float, y: float) -> bool:
+            result = False
+            previous_x, previous_y = points[-1]
+            for current_x, current_y in points:
+                crosses = (current_y > y) != (previous_y > y)
+                if crosses:
+                    at_x = (previous_x - current_x) * (y - current_y) / (previous_y - current_y) + current_x
+                    if x < at_x:
+                        result = not result
+                previous_x, previous_y = current_x, current_y
+            return result
+
+        for iy in range(ymin, ymax + 1):
+            for ix in range(xmin, xmax + 1):
+                if not inside(ix * self.GRID, iy * self.GRID):
+                    continue
+                idx = self._index(ix, iy)
+                for layer in layers:
+                    self.keepout[layer][idx] = 1
+                    self.via_blocked[layer][idx] = 1
+
+    def _owner(self, net: str) -> int:
+        return self.net_numbers.get(net, 1000 + sum(ord(ch) for ch in net))
+
+    def _is_blocked(self, layer: int, ix: int, iy: int, net: str) -> bool:
+        if ix <= 1 or iy <= 1 or ix >= self.WIDTH - 2 or iy >= self.HEIGHT - 2:
+            return True
+        idx = self._index(ix, iy)
+        if self.keepout[layer][idx]:
+            return True
+        if self.track_owner[layer][idx] not in (0, self._owner(net)):
+            return True
+        if self.pad_blocked[layer][idx] and idx not in self.own_pad_cells.get(net, [set(), set()])[layer]:
+            return True
+        return False
+
+    def _via_allowed(
+        self,
+        ix: int,
+        iy: int,
+        net: str,
+        via_min_x: float | None,
+        via_max_x: float | None,
+        via_min_y: float | None,
+    ) -> bool:
+        x = ix * self.GRID
+        y = iy * self.GRID
+        if via_min_x is not None and x < via_min_x:
+            return False
+        if via_max_x is not None and x > via_max_x:
+            return False
+        if via_min_y is not None and y < via_min_y:
+            return False
+        idx = self._index(ix, iy)
+        owner = self._owner(net)
+        return (
+            not self.via_blocked[0][idx]
+            and not self.via_blocked[1][idx]
+            and self.track_owner[0][idx] in (0, owner)
+            and self.track_owner[1][idx] in (0, owner)
+            and not self.keepout[0][idx]
+            and not self.keepout[1][idx]
+        )
+
+    def _heuristic(self, ix: int, iy: int, layer: int, gx: int, gy: int) -> float:
+        return abs(ix - gx) + abs(iy - gy) + (0.05 if layer else 0.0)
+
+    def _mark_radius(self, x: float, y: float, layer: int, radius: float, owner: int) -> None:
+        xmin, xmax = max(0, self._grid(x - radius)), min(self.WIDTH - 1, self._grid(x + radius))
+        ymin, ymax = max(0, self._grid(y - radius)), min(self.HEIGHT - 1, self._grid(y + radius))
+        for iy in range(ymin, ymax + 1):
+            for ix in range(xmin, xmax + 1):
+                px, py = ix * self.GRID, iy * self.GRID
+                if math.hypot(px - x, py - y) <= radius:
+                    idx = self._index(ix, iy)
+                    existing = self.track_owner[layer][idx]
+                    if existing in (0, owner):
+                        self.track_owner[layer][idx] = owner
+                    else:
+                        # Keep collisions visible to later route searches;
+                        # one integer owner must not be overwritten by a
+                        # different net merely because the clearance halos
+                        # overlap on the coarse routing grid.
+                        self.track_owner[layer][idx] = -1
+
+    def _mark_track(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        layer: int,
+        owner: int,
+        radius: float | None = None,
+    ) -> None:
+        radius = self.TRACK_OBSTACLE_RADIUS if radius is None else radius
+        xmin = max(0, self._grid(min(x1, x2) - radius))
+        xmax = min(self.WIDTH - 1, self._grid(max(x1, x2) + radius))
+        ymin = max(0, self._grid(min(y1, y2) - radius))
+        ymax = min(self.HEIGHT - 1, self._grid(max(y1, y2) + radius))
+        for iy in range(ymin, ymax + 1):
+            for ix in range(xmin, xmax + 1):
+                px, py = ix * self.GRID, iy * self.GRID
+                if x1 == x2:
+                    distance = abs(px - x1) if min(y1, y2) <= py <= max(y1, y2) else math.inf
+                elif y1 == y2:
+                    distance = abs(py - y1) if min(x1, x2) <= px <= max(x1, x2) else math.inf
+                else:
+                    vx, vy = x2 - x1, y2 - y1
+                    length2 = vx * vx + vy * vy
+                    t = max(0.0, min(1.0, ((px - x1) * vx + (py - y1) * vy) / length2))
+                    qx, qy = x1 + t * vx, y1 + t * vy
+                    distance = math.hypot(px - qx, py - qy)
+                if distance <= radius:
+                    idx = self._index(ix, iy)
+                    existing = self.track_owner[layer][idx]
+                    if existing in (0, owner):
+                        self.track_owner[layer][idx] = owner
+                    else:
+                        self.track_owner[layer][idx] = -1
+
+    def add_fixed_segment(self, net: str, start: tuple[float, float], end: tuple[float, float], layer: str = "F.Cu", width: float = 0.3) -> None:
+        layer_index = 0 if layer == "F.Cu" else 1
+        number = self.net_numbers[net]
+        self.objects.append(
+            f'\t(segment (start {fmt(start[0])} {fmt(start[1])}) (end {fmt(end[0])} {fmt(end[1])}) '
+            f'(width {fmt(width)}) (layer "{layer}") (net {number}) (uuid "{artwork_uid("segment", len(self.objects))}"))'
+        )
+        self._mark_track(
+            start[0], start[1], end[0], end[1], layer_index, self._owner(net),
+            width / 2 + 0.2 + self.TRACK_SAFETY_MARGIN,
+        )
+        self.segment_count += 1
+
+    def add_fixed_via(self, net: str, point: tuple[float, float]) -> None:
+        number = self.net_numbers[net]
+        self.objects.append(
+            f'\t(via (at {fmt(point[0])} {fmt(point[1])}) (size {fmt(self.VIA_DIAMETER)}) '
+            f'(drill {fmt(self.VIA_DRILL)}) (layers "F.Cu" "B.Cu") (net {number}) '
+            f'(uuid "{artwork_uid("via", len(self.objects))}"))'
+        )
+        for layer in (0, 1):
+            self._mark_radius(point[0], point[1], layer, self.TRACK_OBSTACLE_RADIUS, self._owner(net))
+        self.via_count += 1
+
+    def _add_segment(self, net: str, start: tuple[float, float], end: tuple[float, float], layer: int, width: float) -> None:
+        if math.hypot(start[0] - end[0], start[1] - end[1]) < 1e-6:
+            return
+        layer_name = "F.Cu" if layer == 0 else "B.Cu"
+        number = self.net_numbers[net]
+        self.objects.append(
+            f'\t(segment (start {fmt(start[0])} {fmt(start[1])}) (end {fmt(end[0])} {fmt(end[1])}) '
+            f'(width {fmt(width)}) (layer "{layer_name}") (net {number}) (uuid "{artwork_uid("segment", len(self.objects))}"))'
+        )
+        self._mark_track(
+            start[0], start[1], end[0], end[1], layer, self._owner(net),
+            width / 2 + 0.2 + self.TRACK_SAFETY_MARGIN,
+        )
+        self.segment_count += 1
+
+    def _add_via(self, net: str, point: tuple[float, float]) -> None:
+        number = self.net_numbers[net]
+        self.objects.append(
+            f'\t(via (at {fmt(point[0])} {fmt(point[1])}) (size {fmt(self.VIA_DIAMETER)}) '
+            f'(drill {fmt(self.VIA_DRILL)}) (layers "F.Cu" "B.Cu") (net {number}) '
+            f'(uuid "{artwork_uid("via", len(self.objects))}"))'
+        )
+        for layer in (0, 1):
+            self._mark_radius(point[0], point[1], layer, self.TRACK_OBSTACLE_RADIUS, self._owner(net))
+        self.via_count += 1
+
+    def route_pair(
+        self,
+        net: str,
+        start: tuple[float, float],
+        goal: tuple[float, float],
+        width: float,
+        preferred_layer: int,
+        via_cost: float,
+        via_min_x: float | None = None,
+        via_max_x: float | None = None,
+        via_min_y: float | None = None,
+        start_layer: int = 0,
+        goal_layer: int = 0,
+    ) -> None:
+        sx, sy = self._grid(start[0]), self._grid(start[1])
+        gx, gy = self._grid(goal[0]), self._grid(goal[1])
+        start_state = (start_layer, sx, sy)
+        queue: list[tuple[float, float, int, int, int]] = []
+        heapq.heappush(queue, (self._heuristic(sx, sy, start_layer, gx, gy), 0.0, start_layer, sx, sy))
+        costs: dict[tuple[int, int, int], float] = {start_state: 0.0}
+        parents: dict[tuple[int, int, int], tuple[int, int, int] | None] = {start_state: None}
+        visited = 0
+        final: tuple[int, int, int] | None = None
+        while queue and visited < 500000:
+            _, current_cost, layer, ix, iy = heapq.heappop(queue)
+            state = (layer, ix, iy)
+            if current_cost != costs.get(state):
+                continue
+            visited += 1
+            if ix == gx and iy == gy and layer == goal_layer:
+                final = state
+                break
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = ix + dx, iy + dy
+                if not (0 <= nx < self.WIDTH and 0 <= ny < self.HEIGHT):
+                    continue
+                if self._is_blocked(layer, nx, ny, net) and not (nx == gx and ny == gy and layer == goal_layer):
+                    continue
+                step = 1.0 + (0.04 if layer != preferred_layer else 0.0)
+                next_state = (layer, nx, ny)
+                new_cost = current_cost + step
+                if new_cost < costs.get(next_state, math.inf):
+                    costs[next_state] = new_cost
+                    parents[next_state] = state
+                    heapq.heappush(queue, (new_cost + self._heuristic(nx, ny, layer, gx, gy), new_cost, layer, nx, ny))
+            if self._via_allowed(ix, iy, net, via_min_x, via_max_x, via_min_y):
+                other = 1 - layer
+                next_state = (other, ix, iy)
+                new_cost = current_cost + via_cost
+                if new_cost < costs.get(next_state, math.inf):
+                    costs[next_state] = new_cost
+                    parents[next_state] = state
+                    heapq.heappush(queue, (new_cost + self._heuristic(ix, iy, other, gx, gy), new_cost, other, ix, iy))
+        if final is None:
+            raise RuntimeError(f"route failed for {net}: {start} -> {goal} after {visited} nodes")
+        states: list[tuple[int, int, int]] = []
+        cursor: tuple[int, int, int] | None = final
+        while cursor is not None:
+            states.append(cursor)
+            cursor = parents[cursor]
+        states.reverse()
+
+        # Collapse the 0.25 mm A* walk into orthogonal runs. The geometry is
+        # unchanged, but the generated PCB remains readable and hand-editable
+        # instead of containing thousands of one-cell segments.
+        current_layer = start_layer
+        run_start = start
+        run_end = start
+        previous_direction: tuple[int, int] | None = None
+
+        def flush_run() -> None:
+            nonlocal run_start, run_end, previous_direction
+            self._add_segment(net, run_start, run_end, current_layer, width)
+            run_start = run_end
+            previous_direction = None
+
+        for layer, ix, iy in states[1:]:
+            point = (ix * self.GRID, iy * self.GRID)
+            if layer != current_layer:
+                flush_run()
+                self._add_via(net, point)
+                current_layer = layer
+                run_start = point
+                run_end = point
+                previous_direction = None
+                continue
+            direction = (
+                0 if abs(point[0] - run_end[0]) < 1e-9 else (1 if point[0] > run_end[0] else -1),
+                0 if abs(point[1] - run_end[1]) < 1e-9 else (1 if point[1] > run_end[1] else -1),
+            )
+            if previous_direction is not None and direction != previous_direction:
+                flush_run()
+            run_end = point
+            previous_direction = direction
+        flush_run()
+        self._add_segment(net, run_end, goal, current_layer, width)
+
+    def route_net(
+        self,
+        net: str,
+        endpoints: list[tuple[str, str, float, float]],
+        root: tuple[str, str] | None,
+        width: float,
+        preferred_layer: int,
+        via_cost: float,
+        via_min_x: float | None = None,
+        via_max_x: float | None = None,
+        via_min_y: float | None = None,
+    ) -> None:
+        if len(endpoints) < 2:
+            return
+        if root:
+            root_item = next((item for item in endpoints if item[:2] == root), endpoints[0])
+        else:
+            root_item = endpoints[0]
+        remaining = [item for item in endpoints if item != root_item]
+        remaining.sort(key=lambda item: math.hypot(item[2] - root_item[2], item[3] - root_item[3]))
+        for _, _, x, y in remaining:
+            self.route_pair(
+                net,
+                (root_item[2], root_item[3]),
+                (x, y),
+                width,
+                preferred_layer,
+                via_cost,
+                via_min_x,
+                via_max_x,
+                via_min_y,
+            )
+
+    def add_gnd_stubs(self, endpoints: list[tuple[str, str, float, float]]) -> None:
+        """Bring SMD GND pads to the B.Cu plane with short top-side stubs."""
+        for ref, _, x, y in endpoints:
+            if ref == "U1" and x < 50:
+                via = (44.8, y)
+            elif ref == "U1" and x > 60:
+                via = (67.2, y)
+            elif ref == "U3":
+                via = (80.8, y)
+            elif ref == "D5":
+                via = (110.2, y)
+            elif ref == "R10":
+                via = (102.2, y)
+            elif ref == "R16":
+                via = (108.2, y)
+            else:
+                continue
+            self.add_fixed_segment("GND", (x, y), via, "F.Cu", 0.3)
+            self.add_fixed_via("GND", via)
+
+    def output(self) -> str:
+        return "\n".join(self.objects)
+
+
+def make_copper_zone(net_number: int, net_name: str, layer: str, points: list[tuple[float, float]], clearance: float, name: str) -> str:
+    point_text = " ".join(f"(xy {fmt(x)} {fmt(y)})" for x, y in points)
+    return (
+        f'\t(zone\n'
+        f'\t\t(net {net_number})\n'
+        f'\t\t(net_name "{net_name}")\n'
+        f'\t\t(layer "{layer}")\n'
+        f'\t\t(uuid "{artwork_uid("zone", name)}")\n'
+        f'\t\t(name "{name}")\n'
+        f'\t\t(hatch edge 0.5)\n'
+        f'\t\t(connect_pads (clearance {fmt(clearance)}))\n'
+        f'\t\t(min_thickness 0.25)\n'
+        f'\t\t(filled_areas_thickness no)\n'
+        f'\t\t(fill yes (thermal_gap {fmt(clearance)}) (thermal_bridge_width {fmt(clearance)}))\n'
+        f'\t\t(polygon (pts {point_text}))\n'
+        f'\t)\n'
+    )
+
+
+def make_copper_keepout(name: str, points: list[tuple[float, float]]) -> str:
+    point_text = " ".join(f"(xy {fmt(x)} {fmt(y)})" for x, y in points)
+    return (
+        f'\t(zone\n'
+        f'\t\t(net 0)\n'
+        f'\t\t(net_name "")\n'
+        f'\t\t(layers "F.Cu" "B.Cu")\n'
+        f'\t\t(uuid "{artwork_uid("keepout", name)}")\n'
+        f'\t\t(name "{name}")\n'
+        f'\t\t(hatch full 0.5)\n'
+        f'\t\t(connect_pads (clearance 0))\n'
+        f'\t\t(min_thickness 0.25)\n'
+        f'\t\t(filled_areas_thickness no)\n'
+        f'\t\t(keepout (tracks not_allowed) (vias not_allowed) (pads not_allowed) (copperpour not_allowed) (footprints allowed))\n'
+        f'\t\t(placement (enabled no) (sheetname ""))\n'
+        f'\t\t(fill (thermal_gap 0.5) (thermal_bridge_width 0.5))\n'
+        f'\t\t(polygon (pts {point_text}))\n'
+        f'\t)\n'
+    )
 
 
 def build_schematic() -> None:
@@ -917,21 +1548,21 @@ def build_schematic() -> None:
         ("R7", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (149.86, 82.55), 270, "0.47R 1%"),
         ("L1", "Device:L", "Inductor_SMD:L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering", (163.83, 82.55), 270, "100uH"),
         ("D4", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (180.34, 82.55), 180, "1N5819"),
-        ("R8", "Device:R", "Resistor_SMD:R_0603_1608Metric", (149.86, 99.06), 90, "200"),
+        ("R8", "Device:R", "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal", (149.86, 99.06), 90, "200 1%"),
         ("C6", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D8.0mm_P3.50mm", (130.81, 105.41), 0, "220uF 35V"),
         ("C7", "Device:C", "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P2.50mm", (149.86, 115.57), 0, "470pF 50V C0G"),
-        ("R9", "Device:R", "Resistor_SMD:R_0805_2012Metric", (208.28, 93.98), 0, "10k 1%"),
-        ("R10", "Device:R", "Resistor_SMD:R_0805_2012Metric", (208.28, 115.57), 0, "1k 1%"),
+        ("R9", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (208.28, 93.98), 0, "10k 0.1%"),
+        ("R10", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (208.28, 115.57), 0, "1k 0.1%"),
         ("C8", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (190.50, 93.98), 0, "47uF 35V"),
-        ("R11", "Device:R", "Resistor_SMD:R_0805_2012Metric", (224.79, 93.98), 0, "10k 1%"),
+        ("R11", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (224.79, 93.98), 0, "10k 0.1%"),
         ("D5", "Device:LED", "LED_SMD:LED_0805_2012Metric", (224.79, 106.68), 90, "GREEN LED"),
         ("C9", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (242.57, 96.52), 0, "10uF 50V"),
         ("D7", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (260.35, 104.14), 180, "1N5819"),
         ("D6", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (247.65, 114.30), 90, "1N5819"),
         ("C11", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (278.13, 114.30), 180, "10uF 50V"),
         ("D8", "Device:LED", "LED_SMD:LED_0805_2012Metric", (299.72, 114.30), 270, "RED LED"),
-        ("R16", "Device:R", "Resistor_SMD:R_0805_2012Metric", (299.72, 127.00), 0, "10k 1%"),
-        ("RV1", "Device:R_Potentiometer", "Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical", (279.40, 180.34), 0, "10k TRIM"),
+        ("R16", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (299.72, 127.00), 0, "10k 0.1%"),
+        ("RV1", "Device:R_Potentiometer", "Potentiometer_THT:Potentiometer_Runtron_RM-065_Vertical", (279.40, 180.34), 0, "10k TRIM"),
     ]
     for ref, lib_id, footprint, position, rotation, value in instances:
         root.append(instance_from_old(old, ref, lib_id, footprint, position, rotation, value))
@@ -1338,7 +1969,7 @@ def build_schematic() -> None:
     (OUT / "pico_lta042b010f_carrier.kicad_pro").write_text(SRC_PRO.read_text(encoding="utf-8"), encoding="utf-8")
 
 
-def build_pcb() -> None:
+def build_pcb(with_artwork: bool = True) -> None:
     source = SRC_PCB.read_text(encoding="utf-8")
     objects = top_level_blocks(source[source.index('(net 0 "")'):])
     footprints: dict[str, str] = {}
@@ -1363,18 +1994,32 @@ def build_pcb() -> None:
 
     standard = {
         "J1": (KI_FOOTPRINTS / "Connector_FFC-FPC.pretty/TE_3-1734839-6_1x36-1MP_P0.5mm_Horizontal.kicad_mod", "Connector_FFC-FPC", "LTA042B010F_FFC_36P_0.5mm", (20, 9), 0),
-        "U1": (KI_FOOTPRINTS / "Module.pretty/RaspberryPi_Pico_W_SMD_HandSolder.kicad_mod", "Module", "RaspberryPi_Pico_2W", (56, 44.0), 0),
-        "J2": (KI_FOOTPRINTS / "Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod", "Connector_PinHeader_2.54mm", "5V_INPUT", (105, 8), 0),
-        "J3": (KI_FOOTPRINTS / "Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod", "Connector_PinHeader_2.54mm", "CCFL_INVERTER_13V8", (105, 15), 0),
-        "RV1": (KI_FOOTPRINTS / "Potentiometer_THT.pretty/Potentiometer_Bourns_3296W_Vertical.kicad_mod", "Potentiometer_THT", "10k_CONTRAST_TRIM", (78, 60), 0),
-        "U3": (KI_FOOTPRINTS / "Package_SO.pretty/SOIC-8_3.9x4.9mm_P1.27mm.kicad_mod", "Package_SO", "MC34063AD", (85, 35), 0),
-        "R7": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "0.47R 1%", (72, 12), 0),
-        "R8": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0603_1608Metric.kicad_mod", "Resistor_SMD", "200", (80, 35), 90), "R9": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (101, 35), 90), "R10": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "1k", (101, 48), 90), "R11": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (109, 35), 90), "R16": (KI_FOOTPRINTS / "Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", "Resistor_SMD", "10k", (107, 63), 90),
-        "L1": (KI_FOOTPRINTS / "Inductor_SMD.pretty/L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering.kicad_mod", "Inductor_SMD", "100uH", (85, 22), 0), "D4": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (94, 22), 0), "D6": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (105, 42), 90), "D7": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (108, 22), 0), "D5": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "GREEN LED", (109, 45), 90), "D8": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "RED LED", (107, 55), 90),
-        "C6": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D8.0mm_P3.50mm.kicad_mod", "Capacitor_THT", "220uF 35V", (72, 35), 0), "C8": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "47uF 35V", (95, 38), 0), "C9": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V", (98, 30), 90), "C11": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V (+ to GND)", (113, 45), 0), "C7": (KI_FOOTPRINTS / "Capacitor_THT.pretty/C_Disc_D5.0mm_W2.5mm_P2.50mm.kicad_mod", "Capacitor_THT", "470pF 50V C0G", (72, 50), 90),
+        # Leave a continuous routing aisle between the Pico and the switching
+        # section.  This also gives the four right-side red LCD bits a clean
+        # B.Cu drop without running through the input capacitor.
+        # Placement-first candidate: keep the LCD connector and Pico on the
+        # left, reserve a continuous routing aisle, and make the complete
+        # switching/charge-pump section a compact right-side block.
+        "U1": (KI_FOOTPRINTS / "Module.pretty/RaspberryPi_Pico_W_SMD_HandSolder.kicad_mod", "Module", "RaspberryPi_Pico_2W", (51, 38), 0),
+        "J2": (KI_FOOTPRINTS / "Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod", "Connector_PinHeader_2.54mm", "5V_INPUT", (70, 8), 0),
+        "J3": (KI_FOOTPRINTS / "Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod", "Connector_PinHeader_2.54mm", "CCFL_INVERTER_13V8", (110, 8), 0),
+        "RV1": (KI_FOOTPRINTS / "Potentiometer_THT.pretty/Potentiometer_Runtron_RM-065_Vertical.kicad_mod", "Potentiometer_THT", "10k_CONTRAST_TRIM", (44, -54), 0),
+        "U3": (KI_FOOTPRINTS / "Package_SO.pretty/SOIC-8_3.9x4.9mm_P1.27mm.kicad_mod", "Package_SO", "MC34063AD", (88, 24), 0),
+        "R7": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "0.47R 1%", (70, 15), 0),
+        "R8": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal.kicad_mod", "Resistor_THT", "200 1%", (55, -68), 0),
+        "R9": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "10k 0.1%", (64, -67), 90),
+        "R10": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "1k 0.1%", (64, -54), 90),
+        "R11": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "10k 0.1%", (88, -89), 90),
+        "R16": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "10k 0.1%", (78, -56), 90),
+        "L1": (KI_FOOTPRINTS / "Inductor_SMD.pretty/L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering.kicad_mod", "Inductor_SMD", "100uH", (89, 15), 0), "D4": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (106, 22), 180), "D6": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (102, 50), 90), "D7": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (115, 35), 180), "D5": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "GREEN LED", (116, 29), 90), "D8": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "RED LED", (106, 61), 90),
+        "C6": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D8.0mm_P3.50mm.kicad_mod", "Capacitor_THT", "220uF 35V", (78, 25), 0), "C8": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "47uF 35V", (110, 23), 0), "C9": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V", (101, 29), 0), "C11": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V (+ to GND)", (115, 43), 0), "C7": (KI_FOOTPRINTS / "Capacitor_THT.pretty/C_Disc_D5.0mm_W2.5mm_P2.50mm.kicad_mod", "Capacitor_THT", "470pF 50V C0G", (82, 32), 0),
     }
     for index, ref in enumerate(["TP1", "TP2", "TP3", "TP4"]):
-        standard[ref] = (KI_FOOTPRINTS / "TestPoint.pretty/TestPoint_Pad_D2.0mm.kicad_mod", "TestPoint", {"TP1": "+5V", "TP2": "+13V8", "TP3": "-13V8", "TP4": "GND"}[ref], (10 + index * 10, 65), 0)
+        standard[ref] = (KI_FOOTPRINTS / "TestPoint.pretty/TestPoint_Pad_D2.0mm.kicad_mod", "TestPoint", {"TP1": "+5V", "TP2": "+13V8", "TP3": "-13V8", "TP4": "GND"}[ref], (10, 65), 0)
+    testpoint_positions = {"TP1": (10, 65), "TP2": (14, 65), "TP3": (18, 65), "TP4": (22, 65)}
+    for ref, position in testpoint_positions.items():
+        path, library, value, _, rotation = standard[ref]
+        standard[ref] = (path, library, value, position, rotation)
     for ref, position in {"H1": (4, 5), "H2": (115, 5), "H3": (5, 65), "H4": (115, 65)}.items():
         standard[ref] = (KI_FOOTPRINTS / "MountingHole.pretty/MountingHole_3.2mm_M3.kicad_mod", "MountingHole", "MountingHole", position, 0)
 
@@ -1383,6 +2028,693 @@ def build_pcb() -> None:
         if not path.exists():
             raise FileNotFoundError(path)
         rendered.append(make_footprint(path, library, ref, value, position, nets_for(ref), rotation))
+
+    if not with_artwork:
+        prefix = source[: source.index('(footprint')]
+        graphics_positions = [source.find('(gr_rect'), source.find('(gr_line'), source.find('(gr_arc')]
+        graphics_positions = [position for position in graphics_positions if position >= 0]
+        if not graphics_positions:
+            raise ValueError("board edge graphics not found")
+        suffix = source[min(graphics_positions):]
+        pcb = prefix + "\n\n".join(rendered) + "\n\n" + suffix
+        OUT.mkdir(parents=True, exist_ok=True)
+        (OUT / "pico_lta042b010f_carrier.kicad_pcb").write_text(pcb, encoding="utf-8")
+        print("placement-only: 0 segments, 0 vias")
+        return
+
+    # Generate the first real artwork pass from the actual rendered pad
+    # geometry.  Routing from the rendered footprints avoids a second,
+    # hand-maintained list of pad coordinates drifting away from KiCad.
+    routing_pads = parse_routing_pads(rendered)
+    net_numbers = {name: int(number) for name, number in net_names.items()}
+    router = ArtworkRouter(routing_pads, net_numbers, parse_footprint_keepouts(rendered))
+    endpoint_map: dict[str, list[tuple[str, str, float, float]]] = {}
+    for pad in routing_pads:
+        net = str(pad["net"])
+        if net:
+            endpoint_map.setdefault(net, []).append(
+                (str(pad["ref"]), str(pad["pad"]), float(pad["x"]), float(pad["y"]))
+            )
+
+    # FFC contacts are a dense 0.5 mm row.  Give every non-ground contact a
+    # short, straight fan-out before the general router starts; otherwise the
+    # conservative clearance model quite correctly treats the neighboring
+    # contact pads as a solid wall.  The logical endpoint is moved to the end
+    # of that fan-out while the generated segment still terminates on the pad.
+    # Connector escape slots are monotonic in pad-number order. Keeping the
+    # slot table explicit makes the dense fanout auditable and reproducible.
+    connector_escape_slots = {
+        pad: slot
+        for slot, pad in enumerate([
+            2, 4, 5, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20,
+            21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 33, 35,
+        ])
+    }
+    # Source vias stay clear of the twelve left-side B/G bus levels.  The
+    # 1.0-mm minimum spacing is conservative for the 0.6-mm hand-solder via.
+    connector_escape_y = [
+        12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0,
+        21.0, 22.0, 23.0, 24.0, 25.0, 26.0, 25.5, 31.25, 33.75,
+        36.25, 37.25, 38.25, 41.25, 54.0, 43.75, 62.0, 64.0, 67.0,
+    ]
+    def fanout_y(net: str, pad_number: str) -> float:
+        number = int(pad_number)
+        if net.startswith("LCD_B") and 8 <= number <= 13:
+            return 18.0 + (number - 8) * 2.0
+        if net.startswith("LCD_B") and 8 <= number <= 13:
+            return 12.0 + (number - 8) * 2.0
+        if net.startswith("LCD_G") and 15 <= number <= 20:
+            return 30.0 + (number - 15) * 2.0
+        if net.startswith("LCD_G") and 15 <= number <= 20:
+            return 24.0 + (number - 15) * 2.0
+        if net.startswith("LCD_R") and 22 <= number <= 27:
+            return 44.0 + (number - 22) * 2.0
+        if net.startswith("LCD_R") and 22 <= number <= 27:
+            # The red bus exits on the right side in a non-monotonic pin
+            # order. Keep connector-side escapes in a predictable order so
+            # the long B.Cu bus needs fewer crossovers.
+            red_y = {
+                "LCD_R0": 36.0, "LCD_R1": 38.0, "LCD_R2": 40.0,
+                "LCD_R3": 42.0, "LCD_R4": 44.0, "LCD_R5": 46.0,
+            }
+            return red_y[net]
+        if net in {"LCD_NCLK", "LCD_HSYNC", "LCD_VSYNC"}:
+            # The right-side timing pins run upward from NCLK to VSYNC.
+            timing_y = {"LCD_NCLK": 52.0, "LCD_HSYNC": 50.0, "LCD_VSYNC": 48.0}
+            return timing_y[net]
+        # Connector power and contrast contacts are routed after LCD signals.
+        power_y = {
+            # Power escapes stay close to J1; their long distribution legs
+            # start on B.Cu instead of becoming large F.Cu diagonals across
+            # the signal area.
+            "+3V3": 14.0,
+            "VCPP_ADJ": 16.0,
+            "+5V": 18.0,
+            "-13V8": 20.0,
+            "+13V8": 22.0,
+        }
+        return power_y.get(net, 13.0)
+
+    def fanout_x(net: str, pad_number: str, pad_x: float) -> float:
+        number = int(pad_number)
+        if net.startswith("LCD_B") and 8 <= number <= 13:
+            return 16.0 + (number - 8) * 1.25
+        if net.startswith("LCD_B") and 8 <= number <= 13:
+            return 14.0 + (number - 8) * 1.5
+        if net.startswith("LCD_G") and 15 <= number <= 20:
+            return 21.25 + (number - 15) * 1.25
+        if net.startswith("LCD_G") and 15 <= number <= 20:
+            return 18.0 + (number - 15) * 1.5
+        if net.startswith("LCD_R") and 22 <= number <= 27:
+            return 30.0 + (number - 22) * 1.25
+        if net.startswith("LCD_R") and 22 <= number <= 27:
+            return 22.0 + (27 - number) * 1.5
+        if net in {"LCD_NCLK", "LCD_HSYNC", "LCD_VSYNC"}:
+            timing_x = {"LCD_NCLK": 10.0, "LCD_HSYNC": 12.0, "LCD_VSYNC": 14.0}
+            return timing_x[net]
+        power_x = {
+            "+3V3": {"21": 31.0, "28": 34.0},
+            "VCPP_ADJ": {"29": 36.0},
+            "+5V": {"31": 38.0},
+            "-13V8": {"33": 40.0},
+            "+13V8": {"35": 42.0},
+        }
+        return power_x.get(net, {}).get(pad_number, pad_x)
+
+    source_vias: dict[tuple[str, str], tuple[float, float]] = {}
+    for net, endpoints in endpoint_map.items():
+        for index, (ref, pad_number, x, y) in enumerate(endpoints):
+            if ref != "J1" or net == "GND":
+                continue
+            # Keep the source pad here; the short escape is added immediately
+            # before that net is routed.  Pre-adding every escape would create
+            # an artificial wall for the next A* route in the dense connector
+            # area.
+            source_vias[(net, pad_number)] = (x, y)
+
+    # The plane handles the bulk of the return current.  These short F.Cu
+    # stubs bring isolated SMD ground pads to B.Cu without routing a noisy
+    # ground daisy-chain through the switching area.
+    router.add_gnd_stubs(endpoint_map.get("GND", []))
+
+    root_by_net = {
+        "+5V": ("C6", "1"),
+        "+13V8": ("C8", "1"),
+        "-13V8": ("C11", "2"),
+        "+3V3": ("U1", "36"),
+        "IPK_SENSE": ("L1", "1"),
+        "SW_NODE": ("L1", "2"),
+        "CPUMP_MID": ("C9", "2"),
+        "DRIVER_DC": ("U3", "8"),
+        "TC_TIMING": ("U3", "3"),
+        "VFB": ("U3", "5"),
+        "PWR_LED_P": ("R11", "2"),
+        "NEG_LED_N": ("D8", "2"),
+        "VCPP_ADJ": ("RV1", "2"),
+    }
+    power_order = [
+        "IPK_SENSE", "SW_NODE", "CPUMP_MID", "DRIVER_DC", "TC_TIMING",
+        "VFB", "PWR_LED_P", "NEG_LED_N",
+    ]
+    lcd_order = [
+        "LCD_G0", "LCD_G1", "LCD_G2", "LCD_G3", "LCD_G4", "LCD_G5",
+        "LCD_B0", "LCD_B1", "LCD_B2", "LCD_B3", "LCD_B4", "LCD_B5",
+        "LCD_R0", "LCD_R1", "LCD_R2", "LCD_R3", "LCD_R4", "LCD_R5",
+        "LCD_NCLK", "LCD_HSYNC", "LCD_VSYNC",
+    ]
+    # Route the quiet Pico rail before the high-current +5V distribution so
+    # its local anchor is not boxed in by the later wide power trunk.
+    connector_power_order = ["+3V3", "+5V", "+13V8", "-13V8", "VCPP_ADJ"]
+    hot_nets = {"IPK_SENSE", "SW_NODE", "CPUMP_MID", "DRIVER_DC", "TC_TIMING", "VFB"}
+    wide_nets = {"+5V", "+13V8", "-13V8"}
+    quiet_two_layer_nets = {"+3V3", "PWR_LED_P", "NEG_LED_N", "VCPP_ADJ"}
+    direct_lcd_nets = {
+        "LCD_B5", "LCD_B4", "LCD_B3", "LCD_B2", "LCD_B1", "LCD_B0",
+        "LCD_G5", "LCD_G4", "LCD_G3", "LCD_G2", "LCD_G1", "LCD_G0",
+    }
+
+    def u1_anchor(item: tuple[str, str, float, float]) -> tuple[float, float]:
+        # Keep the destination via outside the Pico pad body; the final
+        # F.Cu segment is a short, explicit dogbone into the SMD pad.
+        pico_x = float(standard["U1"][3][0])
+        return (pico_x - 12.5 if item[2] < pico_x else pico_x + 14.0, item[3])
+
+    def route_lcd_from_vias(
+        net: str,
+        start_item: tuple[str, str, float, float],
+        target_item: tuple[str, str, float, float],
+        width: float,
+    ) -> None:
+        if net.startswith("LCD_R"):
+            # Red starts leave through the free top margin.  Let the
+            # clearance-aware router choose the layer change and final aisle;
+            # a fixed full-height red trunk would cross later top fan-outs.
+            pad_start = source_vias[(net, start_item[1])]
+            top_y = {
+                "LCD_R5": 3.0,
+                "LCD_R4": 3.5,
+                "LCD_R3": 4.0,
+                "LCD_R2": 4.5,
+                "LCD_R1": 5.0,
+                "LCD_R0": 5.5,
+            }[net]
+            router.add_fixed_segment(
+                net, pad_start, (pad_start[0], top_y), "F.Cu", width
+            )
+            target = u1_anchor(target_item)
+            router.add_fixed_via(net, target)
+            router.add_fixed_segment(
+                net, target, (target_item[2], target_item[3]), "F.Cu", width
+            )
+            router.route_pair(
+                net,
+                (pad_start[0], top_y),
+                target,
+                width,
+                preferred_layer=1,
+                via_cost=18.0,
+                via_min_x=28.0,
+                via_max_x=72.0,
+                via_min_y=8.0,
+                start_layer=0,
+                goal_layer=1,
+            )
+            return
+            # The red bank terminates on both sides of the Pico.  Use ordered
+            # top-edge fan-out lanes, then keep the right-side drops on B.Cu
+            # (outside the SMD pad field) and the left-side drops on F.Cu
+            # (above the parallel B/G bus).  This is a deterministic escape
+            # rather than a late A* route through already occupied corridors.
+            pad_start = source_vias[(net, start_item[1])]
+            top_y = {
+                "LCD_R5": 3.0,
+                "LCD_R4": 3.5,
+                "LCD_R3": 4.0,
+                "LCD_R2": 4.5,
+                "LCD_R1": 5.0,
+                "LCD_R0": 5.5,
+            }[net]
+            target = u1_anchor(target_item)
+            router.add_fixed_via(net, target)
+            router.add_fixed_segment(
+                net, target, (target_item[2], target_item[3]), "F.Cu", width
+            )
+            router.add_fixed_segment(
+                net, pad_start, (pad_start[0], top_y), "F.Cu", width
+            )
+            if target_item[2] < 50.0:
+                corridor_x = {"LCD_R5": 38.5, "LCD_R4": 40.0}[net]
+                router.add_fixed_segment(
+                    net, (pad_start[0], top_y), (corridor_x, top_y), "F.Cu", width
+                )
+                router.add_fixed_segment(
+                    net, (corridor_x, top_y), (corridor_x, target[1]), "F.Cu", width
+                )
+                router.add_fixed_segment(
+                    net, (corridor_x, target[1]), target, "F.Cu", width
+                )
+            else:
+                corridor_x = {
+                    "LCD_R0": 64.5,
+                    "LCD_R1": 66.0,
+                    "LCD_R2": 68.0,
+                    "LCD_R3": 70.0,
+                }[net]
+                top_via = (corridor_x, top_y)
+                router.add_fixed_segment(
+                    net, (pad_start[0], top_y), top_via, "F.Cu", width
+                )
+                router.add_fixed_via(net, top_via)
+                router.add_fixed_segment(net, top_via, (corridor_x, target[1]), "B.Cu", width)
+                router.add_fixed_segment(net, (corridor_x, target[1]), target, "B.Cu", width)
+            return
+        if net in {"LCD_NCLK", "LCD_HSYNC", "LCD_VSYNC"}:
+            # Timing lines use the three remaining top-edge lanes.  They stay
+            # on F.Cu so they do not cross the B.Cu red drops, then approach
+            # the Pico's right edge through a dedicated vertical aisle.
+            pad_start = source_vias[(net, start_item[1])]
+            top_y = {
+                "LCD_NCLK": 6.0,
+                "LCD_HSYNC": 6.5,
+                "LCD_VSYNC": 7.0,
+            }[net]
+            corridor_x = {
+                "LCD_NCLK": 62.0,
+                "LCD_HSYNC": 63.5,
+                "LCD_VSYNC": 65.0,
+            }[net]
+            target = u1_anchor(target_item)
+            router.add_fixed_via(net, target)
+            router.add_fixed_segment(
+                net, target, (target_item[2], target_item[3]), "F.Cu", width
+            )
+            router.add_fixed_segment(
+                net, pad_start, (pad_start[0], top_y), "F.Cu", width
+            )
+            router.add_fixed_segment(
+                net, (pad_start[0], top_y), (corridor_x, top_y), "F.Cu", width
+            )
+            router.add_fixed_segment(
+                net, (corridor_x, top_y), (corridor_x, target[1]), "F.Cu", width
+            )
+            router.add_fixed_segment(
+                net, (corridor_x, target[1]), target, "F.Cu", width
+            )
+            return
+        pad_start = source_vias[(net, start_item[1])]
+        escape = (
+            pad_start[0],
+            10.0 + connector_escape_slots[int(start_item[1])] * 0.75,
+        )
+        router.add_fixed_segment(net, pad_start, escape, "F.Cu", 0.15)
+        start = escape
+        target = u1_anchor(target_item)
+        router.add_fixed_via(net, target)
+        router.add_fixed_segment(net, target, (target_item[2], target_item[3]), "F.Cu", width)
+        # Start at the actual FFC pad.  A* chooses the first legal layer
+        # change in open board area; a through-via row is not manufacturable at
+        # the connector's 0.5 mm pitch.
+        router.route_pair(
+            net,
+            start,
+            target,
+            width,
+            preferred_layer=0 if net.startswith("LCD_R") else 1,
+            via_cost=3000.0 if net.startswith("LCD_R") else 18.0,
+            via_min_x=20.0,
+            via_max_x=72.0,
+            via_min_y=10.0,
+            start_layer=0,
+            goal_layer=0 if net.startswith("LCD_R") else 1,
+        )
+        return
+        if net in {"LCD_VSYNC", "LCD_HSYNC", "LCD_NCLK"}:
+            # Timing lines leave the connector on three reserved upper lanes
+            # and descend at the right side of the Pico. Keeping this block
+            # before the RGB buses prevents the timing trunk from becoming a
+            # late A* obstacle that is impossible to escape around.
+            timing = {
+                "LCD_VSYNC": ((71.0, 14.0), 71.0),
+                "LCD_HSYNC": ((73.0, 13.0), 73.0),
+                "LCD_NCLK": ((74.0, 12.0), 74.0),
+            }
+            corner, corridor_x = timing[net]
+            router.add_fixed_segment(net, start, corner, "B.Cu", width)
+            router.add_fixed_segment(net, corner, (corridor_x, target[1]), "B.Cu", width)
+            router.add_fixed_segment(net, (corridor_x, target[1]), target, "B.Cu", width)
+            return
+        if net.startswith("LCD_B") or net.startswith("LCD_G"):
+            # The left-side Pico pads have a monotonic vertical order.  Give
+            # each source a second via at its destination height: the source
+            # leg is vertical on F.Cu and the long bus is horizontal on B.Cu.
+            # This keeps the dense connector escape and the left bus planar,
+            # without diagonal fan-outs or same-layer crossovers.
+            landing = (start[0], target_item[3])
+            router.add_fixed_via(net, landing)
+            router.add_fixed_segment(net, start, landing, "F.Cu", width)
+            router.add_fixed_segment(net, landing, target, "B.Cu", width)
+            return
+        if net.startswith("LCD_R"):
+            # The red contacts terminate on both sides of the Pico.  Keep the
+            # two left-side drops on their destination heights, and use four
+            # nested B.Cu corridors for the right-side drops.  The corridors
+            # approach from below the module's antenna keepout and their
+            # intervals are ordered so they cannot cross one another.
+            if net == "LCD_R0":
+                # R0 shares a height with the lower timing/RGB area.  Change
+                # layer at a point just outside the left bus, then approach
+                # the right-side pad on F.Cu so it does not cross NCLK.
+                landing = (45.0, 54.5)
+                router.add_fixed_via(net, landing)
+                router.add_fixed_segment(net, start, (45.0, start[1]), "B.Cu", width)
+                router.add_fixed_segment(net, (45.0, start[1]), landing, "B.Cu", width)
+                router.add_fixed_segment(net, landing, (78.0, 54.5), "F.Cu", width)
+                router.add_fixed_segment(net, (78.0, 54.5), (78.0, target[1]), "F.Cu", width)
+                router.add_fixed_segment(net, (78.0, target[1]), target, "F.Cu", width)
+                return
+            if target_item[2] < 50.0:
+                landing_y = target_item[3]
+                corridor_x = 43.5
+            else:
+                landing_y = {
+                    "LCD_R3": 61.0,
+                    "LCD_R2": 59.0,
+                    "LCD_R1": 56.5,
+                }[net]
+                corridor_x = {
+                    "LCD_R3": 75.0,
+                    "LCD_R2": 76.0,
+                    "LCD_R1": 77.0,
+                }[net]
+            landing = (start[0], landing_y)
+            router.add_fixed_via(net, landing)
+            router.add_fixed_segment(net, start, landing, "F.Cu", width)
+            if target_item[2] < 50.0:
+                router.add_fixed_segment(net, landing, target, "B.Cu", width)
+            else:
+                router.add_fixed_segment(net, landing, (corridor_x, landing_y), "B.Cu", width)
+                router.add_fixed_segment(net, (corridor_x, landing_y), (corridor_x, target[1]), "B.Cu", width)
+                router.add_fixed_segment(net, (corridor_x, target[1]), target, "B.Cu", width)
+            return
+        # The connector escape is already a clean F.Cu vertical stub ending
+        # in a dedicated via. Keep the long LCD runs on B.Cu so they can pass
+        # under the Pico body without crossing the other signal fan-outs.
+        # A* handles the ordering and avoids previously committed runs;
+        # this is deliberately preferable to hand-drawn diagonals in the
+        # 0.5-mm-pitch connector area.
+        router.route_pair(
+            net,
+            start,
+            target,
+            width,
+            preferred_layer=1,
+            via_cost=2000.0,
+            via_min_x=30.0,
+            via_max_x=72.0,
+            via_min_y=11.5,
+            start_layer=1,
+            goal_layer=1,
+        )
+
+    def fixed_path(net: str, points: list[tuple[float, float]], layer: str, width: float) -> None:
+        for start, end in zip(points, points[1:]):
+            router.add_fixed_segment(net, start, end, layer, width)
+
+    def fixed_via_path(net: str, pad: tuple[float, float], via: tuple[float, float], width: float) -> None:
+        router.add_fixed_segment(net, pad, via, "F.Cu", width)
+        router.add_fixed_via(net, via)
+
+    # VSYNC is the lowest of the right-edge timing destinations. Reserve it
+    # before the quiet +3V3 perimeter branch so that branch cannot seal its
+    # final B.Cu approach.
+    # Complete the parallel LCD bus while both copper layers are still mostly
+    # open.  The switching/power routes are added afterward as fixed local
+    # geometry, so they cannot seal the signal escape corridors first.
+    route_order = lcd_order + power_order + ["+5V", "+3V3", "+13V8", "-13V8", "VCPP_ADJ"]
+    for net in route_order:
+        endpoints = endpoint_map.get(net, [])
+        if len(endpoints) < 2:
+            continue
+        is_lcd = net.startswith("LCD_")
+        # The 0.5 mm-pitch LCD bus is routed as 0.15 mm signal traces.  This
+        # is a conservative hand-assembly-friendly width for short 3.3 V
+        # logic runs and preserves the required 0.2 mm copper clearance.
+        width = 0.15 if is_lcd else 0.3
+        if net in hot_nets:
+            width = 0.35
+        elif net in wide_nets:
+            width = 0.6
+        if is_lcd:
+            start = next(item for item in endpoints if item[0] == "J1")
+            goal = next(item for item in endpoints if item[0] == "U1")
+            route_lcd_from_vias(net, start, goal, width)
+            continue
+        if net == "IPK_SENSE":
+            # Keep the current-sense connection away from the SW node and
+            # bring it into L1 from the quiet upper side of the footprint.
+            fixed_path(net, [(87.475, 34.365), (91.0, 34.365), (91.0, 30.0), (80.3, 30.0), (80.3, 22.0)], "F.Cu", 0.35)
+            fixed_path(net, [(82.16, 12.0), (82.16, 18.75), (80.3, 18.75), (80.3, 22.0)], "F.Cu", 0.35)
+            continue
+        if net == "SW_NODE":
+            # The high di/dt loop is kept short on F.Cu: L1 -> D4 is a
+            # straight run, and U3 pin 1 approaches L1 from below.
+            fixed_path(net, [(89.7, 22.0), (93.0, 22.0)], "F.Cu", 0.5)
+            fixed_path(net, [(82.525, 33.095), (84.5, 33.095), (84.5, 27.0), (89.7, 27.0), (89.7, 22.0)], "F.Cu", 0.5)
+            continue
+        if net == "CPUMP_MID":
+            # C9, D6 and D7 form the charge-pump loop. They are through-hole
+            # pads, so the short top-side connections do not need vias.
+            fixed_path(net, [(98.0, 28.0), (105.0, 31.84)], "F.Cu", 0.35)
+            fixed_path(net, [(98.0, 28.0), (118.16, 22.0)], "F.Cu", 0.35)
+            continue
+        if net == "TC_TIMING":
+            timing_via = (78.0, 35.635)
+            fixed_via_path(net, (82.525, 35.635), timing_via, 0.3)
+            fixed_path(net, [timing_via, (78.0, 50.0), (72.0, 50.0)], "B.Cu", 0.3)
+            continue
+        if net == "VFB":
+            # Route the feedback divider on B.Cu in its own corridor, away
+            # from the SW/output loop and the positive rail.
+            u3_via = (90.5, 37.5)
+            r9_via = (99.0, 34.087)
+            r10_via = (99.0, 48.913)
+            fixed_via_path(net, (87.475, 36.905), u3_via, 0.3)
+            fixed_via_path(net, (101.0, 34.087), r9_via, 0.3)
+            fixed_via_path(net, (101.0, 48.913), r10_via, 0.3)
+            fixed_path(net, [u3_via, (90.5, 42.0), (99.0, 42.0), r9_via], "B.Cu", 0.3)
+            fixed_path(net, [(99.0, 42.0), r10_via], "B.Cu", 0.3)
+            continue
+        if net == "PWR_LED_P":
+            # Go around the adjacent +13V8 pad on R11 rather than passing
+            # through the two-pad footprint.
+            fixed_path(net, [(109.0, 34.087), (111.0, 34.087), (111.0, 44.062), (109.0, 44.062)], "F.Cu", 0.3)
+            continue
+        if net == "NEG_LED_N":
+            # Likewise route around D8's -13V8 pad and the R16 ground pad.
+            fixed_path(net, [(107.0, 54.062), (109.5, 54.062), (109.5, 63.913), (107.0, 63.913)], "F.Cu", 0.3)
+            continue
+        if net == "+3V3":
+            # +3V3 is a quiet rail: distribute it on B.Cu from the Pico-side
+            # anchor, with both J1 contacts retained as separate branches.
+            root = next(item for item in endpoints if item[:2] == ("U1", "36"))
+            root_anchor = (70.0, 30.0)
+            router.add_fixed_via(net, root_anchor)
+            router.add_fixed_segment(net, root_anchor, (root[2], root[3]), "F.Cu", width)
+            # The two J1 contacts are deliberately taken through separate
+            # left-side B.Cu corridors.  Their levels are chosen between the
+            # future B/G buses, so the signal artwork can remain monotonic.
+            fixed_path(
+                net,
+                [root_anchor, (68.0, 30.0), (68.0, 25.5), source_vias[(net, "21")]],
+                "B.Cu",
+                width,
+            )
+            fixed_path(
+                net,
+                [root_anchor, (68.0, 30.0), (68.0, 54.0), source_vias[(net, "28")]],
+                "B.Cu",
+                width,
+            )
+            continue
+        if net == "+5V":
+            # Use the bulk input capacitor as the B.Cu distribution point.
+            # SMD consumers leave the component side through dedicated
+            # dogbone vias; connector/test-point/THT pads can join directly
+            # on B.Cu. This avoids forcing a long route through the SOIC pin
+            # field.
+            root = next(item for item in endpoints if item[:2] == ("C6", "1"))
+            width = 0.6
+
+            def add_power_smd_anchor(item: tuple[str, str, float, float], anchor: tuple[float, float]) -> tuple[float, float]:
+                router.add_fixed_via(net, anchor)
+                router.add_fixed_segment(net, anchor, (item[2], item[3]), "F.Cu", width)
+                return anchor
+
+            targets: list[tuple[float, float]] = []
+            for item in endpoints:
+                if item[:2] == ("U1", "40"):
+                    targets.append(add_power_smd_anchor(item, (68.5, 19.87)))
+                elif item[:2] == ("U3", "6"):
+                    targets.append(add_power_smd_anchor(item, (90.0, 35.635)))
+                elif item[:2] == ("R8", "1"):
+                    targets.append(add_power_smd_anchor(item, (80.0, 38.5)))
+                elif item[0] == "J1":
+                    # The short J1 fanout already connects the pad to its
+                    # escape via. Approach that via on B.Cu so this wide
+                    # branch stays off the dense F.Cu connector fan-out.
+                    source_target = source_vias[(net, item[1])]
+                else:
+                    targets.append((item[2], item[3]))
+            # The J1 branch uses an upper F.Cu perimeter and changes to B.Cu
+            # only at the far-left side. This keeps the 0.6-mm rail out of
+            # the LCD corridors and away from the connector fan-out tracks.
+            if source_target is not None:
+                # The connector escape is already tied to both copper layers
+                # by its via. Use a dedicated B.Cu corridor above the Pico
+                # antenna keepout, then drop on the left side of the LCD bus.
+                # This keeps the wide input branch deterministic and away
+                # from the later signal fan-outs.
+                fixed_path(net, [(root[2], root[3]), (72.0, 6.0),
+                                 (10.0, 6.0), (10.0, 62.0)], "B.Cu", width)
+                router.add_fixed_via(net, (10.0, 62.0))
+                fixed_path(net, [(10.0, 62.0), source_target], "B.Cu", width)
+            for target in targets:
+                if target == (root[2], 12.0):
+                    continue
+                router.route_pair(
+                    net,
+                    (root[2], root[3]),
+                    target,
+                    width,
+                    preferred_layer=1,
+                    via_cost=1500.0,
+                    start_layer=1,
+                    goal_layer=1,
+                )
+            continue
+        if net == "+13V8":
+            # Keep the output rail under the same clearance-aware router as
+            # the rest of the board. D4 is the B.Cu root; the two divider/LED
+            # pads leave F.Cu through dedicated vias, while THT pads and the
+            # J1 escape are direct B.Cu destinations.
+            root = (103.16, 22.0)
+            targets: list[tuple[float, float]] = []
+            for item in endpoints:
+                if item[:2] == ("R9", "1"):
+                    anchor = (103.5, 35.5)
+                    fixed_via_path(net, (item[2], item[3]), anchor, width)
+                    targets.append(anchor)
+                elif item[:2] == ("R11", "1"):
+                    anchor = (107.0, 35.5)
+                    fixed_via_path(net, (item[2], item[3]), anchor, width)
+                    targets.append(anchor)
+                elif item[0] in {"J1", "TP2"}:
+                    # These two endpoints use the dedicated left perimeter
+                    # branch below, rather than a star route through the RGB
+                    # signal field.
+                    continue
+                elif item[:2] not in {("D4", "1"), ("C9", "1"), ("C8", "1")}:
+                    targets.append((item[2], item[3]))
+            for target in targets:
+                router.route_pair(
+                    net,
+                    root,
+                    target,
+                    width,
+                    preferred_layer=1,
+                    via_cost=15.0,
+                    start_layer=1,
+                    goal_layer=1,
+                )
+            router.route_pair(net, root, (98.0, 30.0), width, preferred_layer=0, via_cost=15.0, start_layer=0, goal_layer=0)
+            router.route_pair(net, (98.0, 30.0), (95.0, 38.0), width, preferred_layer=0, via_cost=15.0, start_layer=0, goal_layer=0)
+            # Feed the connector and the +13V8 test point from the top-left
+            # perimeter. The branch stays above the antenna envelope while
+            # crossing the board, then uses a quiet lower-left corridor.
+            fixed_path(
+                net,
+                [root, (103.16, 10.0), (8.0, 10.0), (8.0, 67.0),
+                 (20.0, 67.0), (20.0, 65.0)],
+                "B.Cu",
+                width,
+            )
+            fixed_path(net, [(20.0, 67.0), source_vias[(net, "35")]], "B.Cu", width)
+            continue
+        if net == "-13V8":
+            # Keep the negative rail on the far-right side. C11 is the
+            # B.Cu distribution root; D8 leaves through one dedicated via,
+            # while D7, the J1 escape and TP3 are routed as separate branches.
+            root = (115.0, 45.0)
+            root_exit = (116.0, 45.0)
+            router.add_fixed_segment(net, root, root_exit, "B.Cu", width)
+            d8 = next(item for item in endpoints if item[:2] == ("D8", "1"))
+            d8_anchor = (109.5, 55.938)
+            fixed_via_path(net, (d8[2], d8[3]), d8_anchor, width)
+            targets = [
+                next(item for item in endpoints if item[:2] == ("D7", "1")),
+                d8_anchor,
+            ]
+            for target_item in targets:
+                target = (target_item[2], target_item[3]) if isinstance(target_item, tuple) and len(target_item) == 4 else target_item
+                router.route_pair(
+                    net,
+                    root_exit,
+                    target,
+                    width,
+                    preferred_layer=1,
+                    via_cost=15.0,
+                    start_layer=1,
+                    goal_layer=1,
+                )
+            # The connector and TP3 are brought from a separate far-left
+            # perimeter branch. Leaving C11 to the right is essential because
+            # its adjacent pad 1 is GND.
+            fixed_path(
+                net,
+                [root_exit, (116.0, 8.0), (6.0, 8.0), (6.0, 64.0),
+                 (30.0, 64.0), (30.0, 65.0)],
+                "B.Cu",
+                width,
+            )
+            fixed_path(net, [(30.0, 64.0), source_vias[(net, "33")]], "B.Cu", width)
+            continue
+        if net == "VCPP_ADJ":
+            # Contrast control is a quiet signal. Use a perimeter B.Cu route
+            # and approach RV1 pad 2 vertically, avoiding the neighbouring
+            # +3V3 and GND pads.
+            vcpp_source = source_vias[(net, "29")]
+            fixed_path(
+                net,
+                [vcpp_source, (25.25, 5.0), (77.5, 5.0), (77.5, 37.0),
+                 (75.46, 37.0), (75.46, 60.0)],
+                "F.Cu",
+                0.3,
+            )
+            continue
+        if net == "DRIVER_DC":
+            # U3 pin 8 to the R8 driver resistor is a short local connection.
+            # Bring both ends to B.Cu outside the SOIC pin field; routing a
+            # direct F.Cu diagonal through the pin row would cross SW_NODE.
+            u3 = next(item for item in endpoints if item[:2] == ("U3", "8"))
+            r8 = next(item for item in endpoints if item[:2] == ("R8", "2"))
+            u3_via = (90.0, 33.095)
+            r8_via = (78.5, 33.0)
+            fixed_via_path(net, (u3[2], u3[3]), u3_via, width)
+            fixed_via_path(net, (r8[2], r8[3]), r8_via, width)
+            fixed_path(net, [u3_via, r8_via], "B.Cu", width)
+            continue
+        router.route_net(
+            net,
+            endpoints,
+            root_by_net.get(net),
+            width,
+            preferred_layer=1 if (is_lcd or net in quiet_two_layer_nets) else 0,
+            via_cost=6.0 if (is_lcd or net in quiet_two_layer_nets) else 50.0,
+            via_min_x=18.0 if is_lcd else None,
+            via_max_x=71.0 if is_lcd else None,
+            via_min_y=11.5 if is_lcd else None,
+        )
+
     prefix = source[: source.index('(footprint')]
     graphics_positions = [source.find('(gr_rect'), source.find('(gr_line'), source.find('(gr_arc')]
     graphics_positions = [position for position in graphics_positions if position >= 0]
@@ -1392,12 +2724,80 @@ def build_pcb() -> None:
     # Keep the board annotation legible and above the project's 0.8 mm
     # silkscreen minimum while retaining the native KiCad graphics.
     suffix = suffix.replace('(size 0.65 0.65)', '(size 0.8 0.8)').replace('(size 0.6 0.6)', '(size 0.8 0.8)')
-    pcb = prefix + "\n\n".join(rendered) + "\n\n" + suffix
+    suffix = suffix.replace(
+        "PICO 2W / LTA042B010F RGB666 + BIPOLAR POWER - PLACEMENT DRAFT",
+        "PICO 2W / LTA042B010F RGB666 + BIPOLAR POWER",
+    )
+    suffix = suffix.replace("NO COPPER ROUTING YET", "2-LAYER HAND-SOLDER ROUTING")
+    zone = make_copper_zone(
+        net_numbers["GND"],
+        "GND",
+        "B.Cu",
+        [(0.6, 0.6), (119.4, 0.6), (119.4, 69.4), (0.6, 69.4)],
+        0.3,
+        "GND_PLANE",
+    )
+    antenna_keepout = make_copper_keepout(
+        "Pico 2W antenna copper keepout",
+        [(43.5, 61.5), (58.5, 61.5), (58.5, 69.4), (43.5, 69.4)],
+    )
+    artwork = router.output() + "\n\n" + zone + "\n" + antenna_keepout
+    pcb = prefix + "\n\n".join(rendered) + "\n\n" + artwork + "\n" + suffix
+    print(f"artwork: {router.segment_count} segments, {router.via_count} vias")
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "pico_lta042b010f_carrier.kicad_pcb").write_text(pcb, encoding="utf-8")
 
 
+def apply_generated_component_footprints(references: set[str]) -> None:
+    """Replace only selected PCB footprint instances from the reviewed candidate.
+
+    This preserves board graphics, zones, and unrelated manual PCB edits while
+    applying the exact library geometry, pad stack, 3D model, and placement that
+    were just generated for the requested component substitutions.
+    """
+
+    def footprint_spans(board: str) -> list[tuple[int, int, str]]:
+        spans: list[tuple[int, int, str]] = []
+        cursor = 0
+        while True:
+            start = board.find('(footprint "', cursor)
+            if start < 0:
+                return spans
+            end = find_balanced(board, start)
+            block = board[start:end]
+            reference = re.search(r'\(property "Reference" "([^"]+)"', block)
+            if reference:
+                spans.append((start, end, reference.group(1)))
+            cursor = end
+
+    candidate_path = OUT / "pico_lta042b010f_carrier.kicad_pcb"
+    candidate = candidate_path.read_text(encoding="utf-8")
+    candidate_blocks = {
+        reference: candidate[start:end]
+        for start, end, reference in footprint_spans(candidate)
+        if reference in references
+    }
+    target = SRC_PCB.read_text(encoding="utf-8")
+    target_spans = footprint_spans(target)
+    target_references = {reference for _, _, reference in target_spans}
+    missing = references - candidate_blocks.keys() | references - target_references
+    if missing:
+        raise ValueError(f"footprints not found for replacement: {sorted(missing)}")
+
+    result: list[str] = []
+    cursor = 0
+    for start, end, reference in target_spans:
+        result.append(target[cursor:start])
+        result.append(candidate_blocks[reference] if reference in references else target[start:end])
+        cursor = end
+    result.append(target[cursor:])
+    SRC_PCB.write_text("".join(result), encoding="utf-8")
+    print(f"applied component footprints: {', '.join(sorted(references))}")
+
+
 if __name__ == "__main__":
     build_schematic()
-    build_pcb()
+    build_pcb(with_artwork="--placement-only" not in sys.argv)
+    if "--apply-component-footprints" in sys.argv:
+        apply_generated_component_footprints({"R8", "R9", "R10", "R11", "R16", "RV1"})
     print(OUT)
