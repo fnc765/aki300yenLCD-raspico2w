@@ -1,0 +1,14 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-09-16T18:10:58+0900",
+    "kicad_version": "9.0.1",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/10000000-0000-4000-8000-000000000001",
+            "violations": []
+        }
+    ],
+    "source": "pico_lta042b010f_carrier.kicad_sch"
+}

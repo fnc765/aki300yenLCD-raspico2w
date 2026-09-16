@@ -21,19 +21,25 @@ BOARD = ROOT / "pico_lta042b010f_carrier.kicad_pcb"
 # Coordinates in mm, KiCad rotation in degrees; each origin is the real footprint
 # origin (usually pad 1 for THT). Electrical component values remain unchanged.
 PLACEMENT = {
-    "J2": (38.25, 12.75, 90), "J3": (8.25, 31.25, 0),
-    "U3": (25.25, 22.75, 0), "L1": (17.5, 11, 0),
-    "C6": (35.75, 22.75, 180), "R7": (38.25, 16.25, 180), "R8": (20.25, 18, 0),
-    "D4": (19.25, 31.25, 90), "C8": (14.25, 29.25, 90),
-    "C7": (23, 27.75, 0),
-    "R9": (39, 32.5, 180), "R10": (28.75, 29, 0),
-    "C9": (45, 15, 0), "D6": (47, 30, 90), "D7": (60.5, 19, 180),
-    "C11": (55, 29, 0), "R11": (5, 39, 0), "D5": (21.5, 39, 180),
-    "R16": (43, 35, 0), "D8": (58, 34, 180),
-    "RV1": (16, 48, 180),
-    "TP1": (41, 23, 0), "TP2": (15, 35.5, 0),
-    "TP3": (57, 39, 0), "TP4": (6, 42, 0),
+    "J2": (11.25, 2.25, 90), "J3": (22.25, 35.5, 90),
+    "U3": (11.5, 32.75, 90), "L1": (18.0, 46.0, 180),
+    "C6": (17.25, 18.5, 90), "R7": (2.5, 41.5, 90),
+    "R8": (18.75, 23.5, 180), "D4": (9.25, 49.25, 90),
+    "C8": (16.25, 28.5, 0), "C7": (5.75, 39.25, 270),
+    "R9": (21.75, 22.25, 270), "R10": (14.0, 39.0, 0),
+    "C9": (9.75, 22.5, 90), "D6": (2.0, 10.5, 0),
+    "D7": (7.0, 36.0, 90), "C11": (18.25, 34.25, 180),
+    "R11": (25.0, 22.25, 270), "D5": (2.75, 26.0, 270),
+    "R16": (1.5, 14.25, 0), "D8": (5.25, 19.0, 180),
+    "RV1": (14.75, 6.0, 0), "TP1": (24.75, 16.0, 90),
+    "TP2": (23.0, 3.0, 90), "TP3": (10.5, 26.0, 90),
+    "TP4": (9.5, 5.75, 90),
 }
+
+REGION = (0.4, 0.4, 26.6, 51.6)
+TOP_NOTCH = (25.0, 0.0, 26.6, 10.0)
+FIXED_REFERENCES = ("J1", "H1", "H2")
+CLEARANCE = 0.15
 
 
 def place_reference_fields(board):
@@ -78,9 +84,15 @@ def place_reference_fields(board):
                 for x, y in candidates:
                     field.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
                     bounds = box(field.GetBoundingBox())
-                    outside = max(0.4-bounds[0],0) + max(bounds[2]-99.6,0) + max(0.4-bounds[1],0) + max(bounds[3]-51.6,0)
-                    if bounds[2] > 24.6 and bounds[0] < 50.4 and bounds[1] < 10.4:
-                        outside += 10.4-bounds[1]
+                    outside = (max(REGION[0]-bounds[0], 0)
+                               + max(bounds[2]-REGION[2], 0)
+                               + max(REGION[1]-bounds[1], 0)
+                               + max(bounds[3]-REGION[3], 0))
+                    notch_dx = max(0, min(bounds[2], TOP_NOTCH[2])
+                                   - max(bounds[0], TOP_NOTCH[0]))
+                    notch_dy = max(0, min(bounds[3], TOP_NOTCH[3])
+                                   - max(bounds[1], TOP_NOTCH[1]))
+                    outside += 10 * notch_dx * notch_dy
                     penalty = 10000 * (outside + sum(overlap(bounds, bb) for bb in body.values()) + sum(overlap(bounds,bb) for bb in placed))
                     score = penalty + math.dist((x,y),(cx,cy)) + 8*(0.85-font)
                     if best is None or score < best[0]:
@@ -89,10 +101,45 @@ def place_reference_fields(board):
         field.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(font),pcbnew.FromMM(font)))
         field.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x),pcbnew.FromMM(y)))
         placed.append(box(field.GetBoundingBox()))
-    # TP1 has no courtyard in the original footprint; place the adjacent bulk
-    # capacitor identifier in the verified clear area below its test pad.
-    fp['C6'].Reference().SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(0.85),pcbnew.FromMM(0.85)))
-    fp['C6'].Reference().SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(40),pcbnew.FromMM(26)))
+
+
+def validate_red_zone(board):
+    """Prove target courtyards stay inside the marked red area and do not overlap."""
+    layers = pcbnew.LSET()
+    layers.AddLayer(pcbnew.F_CrtYd)
+    footprints = {f.GetReference(): f for f in board.GetFootprints()}
+
+    def bounds(ref):
+        item = footprints[ref]
+        rect = item.GetLayerBoundingBox(layers)
+        if rect.GetWidth() <= 0 or rect.GetHeight() <= 0:
+            rect = item.GetBoundingBox(False, False)
+        return tuple(pcbnew.ToMM(v) for v in
+                     (rect.GetX(), rect.GetY(), rect.GetRight(), rect.GetBottom()))
+
+    def overlap(a, b, gap=0.0):
+        return (min(a[2], b[2]) - max(a[0], b[0]) + gap > 0
+                and min(a[3], b[3]) - max(a[1], b[1]) + gap > 0)
+
+    boxes = {ref: bounds(ref) for ref in PLACEMENT}
+    errors = []
+    for ref, box in boxes.items():
+        if (box[0] < REGION[0] or box[1] < REGION[1]
+                or box[2] > REGION[2] or box[3] > REGION[3]):
+            errors.append(f"{ref} courtyard outside red zone: {box}")
+        if overlap(box, TOP_NOTCH):
+            errors.append(f"{ref} courtyard overlaps top board cutout: {box}")
+    refs = list(boxes)
+    for index, ref in enumerate(refs):
+        for other in refs[index + 1:]:
+            if overlap(boxes[ref], boxes[other], CLEARANCE):
+                errors.append(f"{ref}/{other} courtyards overlap")
+        for fixed in FIXED_REFERENCES:
+            if overlap(boxes[ref], bounds(fixed), CLEARANCE):
+                errors.append(f"{ref}/{fixed} courtyards overlap")
+    if errors:
+        raise AssertionError("Red-zone validation failed:\n" + "\n".join(errors))
+    return boxes
 
 
 def children(text):
@@ -260,11 +307,17 @@ def main():
     reloaded = pcbnew.LoadBoard(str(args.output))
     if signature(reloaded) != before_signature:
         raise AssertionError("Reloaded PCB electrical signature mismatch")
+    red_zone_bounds = validate_red_zone(reloaded)
     report = {
         "input_sha256": hashlib.sha256(before_bytes).hexdigest(),
         "footprints_moved": sorted(PLACEMENT),
         "electrical_signature_unchanged": True,
         "other_footprints_edges_keepouts_and_nets_verbatim": True,
+        "all_target_courtyards_inside_red_zone": True,
+        "target_courtyard_overlap_count": 0,
+        "red_zone_mm": REGION,
+        "top_board_cutout_mm": TOP_NOTCH,
+        "target_courtyard_bounds_mm": red_zone_bounds,
         "draft_annotations_moved_to_Dwgs_User": len(changed_graphics),
         "before_pad_distances_mm": before_measurements,
         "after_pad_distances_mm": measurements(reloaded),
