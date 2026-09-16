@@ -1,0 +1,27 @@
+{
+  "scope": "pico-lcd-and-remaining-board-routing",
+  "erc_violations": 0,
+  "drc_violations": 13,
+  "drc_unconnected_items": 0,
+  "routing_shorting_items": 0,
+  "routing_tracks_crossing": 0,
+  "routing_clearance_violations": 0,
+  "routing_hole_clearance_violations": 0,
+  "routing_copper_edge_clearance_violations": 0,
+  "routing_track_dangling": 0,
+  "routing_via_dangling": 0,
+  "routing_solder_mask_bridge": 0,
+  "route_groups_added": 127,
+  "vias_added": 95,
+  "ground_zone": "LOGIC_GND on B.Cu",
+  "pico_u1_footprint_modified": false,
+  "lcd_j1_footprint_modified": false,
+  "remaining_drc_types": {
+    "lib_footprint_mismatch": 9,
+    "silk_edge_clearance": 2,
+    "items_not_allowed": 1,
+    "silk_overlap": 1
+  },
+  "remaining_items_note": "All remaining DRC items are non-routing issues. The items_not_allowed entry is the pre-existing H3 footprint in the Pico RF keepout.",
+  "hardware_validation": "not performed"
+}
