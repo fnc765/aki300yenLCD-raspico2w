@@ -145,22 +145,6 @@ AKIZUKI_COMPONENT_FIELDS: dict[str, dict[str, str]] = {
         "SourceURL": "https://akizukidenshi.com/catalog/g/g116877/",
         "SelectionNote": "10kohm +/-0.1%; 1/4W; axial through-hole; vertical mounting",
     },
-    "R17": {
-        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
-        "MPN": "MFS25F5K1B",
-        "AkizukiCode": "108547",
-        "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g108547/",
-        "SelectionNote": "5.1kohm +/-1%; USB Type-C CC1 pull-down; vertical mounting",
-    },
-    "R18": {
-        "Manufacturer": "FAITHFUL LINK INDUSTRIAL CORP.",
-        "MPN": "MFS25F5K1B",
-        "AkizukiCode": "108547",
-        "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g108547/",
-        "SelectionNote": "5.1kohm +/-1%; USB Type-C CC2 pull-down; vertical mounting",
-    },
     "L1": {
         "Manufacturer": "Taiyo Yuden",
         "MPN": "NR10050T101M",
@@ -258,12 +242,12 @@ AKIZUKI_COMPONENT_FIELDS: dict[str, dict[str, str]] = {
         "SelectionNote": "10kohm +/-30%; 0.1W; top-adjust single-turn trimmer; RM-065 through-hole footprint",
     },
     "J2": {
-        "Manufacturer": "Akizuki Denshi Tsusho",
-        "MPN": "AE-USB2.0-TYPE-C",
-        "AkizukiCode": "113080",
+        "Manufacturer": "Chang Enn Co., Ltd.",
+        "MPN": "A295-CTRPB-1",
+        "AkizukiCode": "116895",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g113080/",
-        "SelectionNote": "USB Type-C female breakout; seven 2.54mm through-hole pins; CC1/CC2 each require 5.1kohm to GND",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g116895/",
+        "SelectionNote": "compact power-only USB Type-C receptacle; through-hole; no CC contacts; use a USB-A source with an A-to-C cable",
     },
     "J3": {
         "Manufacturer": "Chang Enn",
@@ -430,8 +414,6 @@ FIELD_LAYOUTS: dict[str, dict[str, tuple[float, float, float]]] = {
     "C11": {"Reference": (271.78, 111.76, 0), "Value": (271.78, 116.84, 0)},
     "D8": {"Reference": (292.00, 111.76, 0), "Value": (292.00, 116.84, 0)},
     "R16": {"Reference": (292.00, 123.19, 0), "Value": (292.00, 130.81, 0)},
-    "R17": {"Reference": (124.46, 100.33, 0), "Value": (124.46, 97.79, 0)},
-    "R18": {"Reference": (124.46, 107.95, 0), "Value": (124.46, 110.49, 0)},
     "RV1": {"Reference": (287.02, 173.99, 0), "Value": (279.40, 195.58, 0)},
 }
 
@@ -562,6 +544,16 @@ def expand_connector_pins(block: str, count: int) -> str:
         if number not in existing
     )
     return block[:insertion] + additions + block[insertion:]
+
+
+def resize_connector_pins(block: str, count: int) -> str:
+    """Remove obsolete generic-connector pins, then add any missing pins."""
+    block = re.sub(
+        r'\s*\(pin "(\d+)" \(uuid "[^"]+"\)\)',
+        lambda match: "" if int(match.group(1)) > count else match.group(0),
+        block,
+    )
+    return expand_connector_pins(block, count)
 
 
 def no_connect(x: float, y: float) -> str:
@@ -1617,13 +1609,13 @@ def build_schematic() -> None:
     j2 = instance_from_old(
         old,
         "J2",
-        "Connector_Generic:Conn_01x07",
-        "Custom:AE_USB2.0_TYPE_C",
+        "Connector_Generic:Conn_01x02",
+        "Custom:A295_CTRPB_1",
         (139.70, 100.33),
         0,
         "USB-C 5V INPUT",
     )
-    root.append(expand_connector_pins(j2, 7))
+    root.append(resize_connector_pins(j2, 2))
 
     instances = [
         ("J3", "Connector_Generic:Conn_01x02", "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", (279.40, 153.67), 0, "13V8 OUT"),
@@ -1649,16 +1641,6 @@ def build_schematic() -> None:
     ]
     for ref, lib_id, footprint, position, rotation, value in instances:
         root.append(instance_from_old(old, ref, lib_id, footprint, position, rotation, value))
-    root.append(clone_instance_from_old(
-        old, "R8", "R17", "Device:R",
-        "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P2.54mm_Vertical",
-        (125.73, 102.87), 90, "5.1k 1%"
-    ))
-    root.append(clone_instance_from_old(
-        old, "R8", "R18", "Device:R",
-        "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P2.54mm_Vertical",
-        (125.73, 105.41), 90, "5.1k 1%"
-    ))
     pin_endpoints = collect_pin_endpoints(new_lib, root)
 
     for block in objects:
@@ -1851,17 +1833,13 @@ def build_schematic() -> None:
 
     gnd_y, plus_y = 139.70, 82.55
     wires = [
-        # J2 is the Akizuki seven-pin USB Type-C breakout. Pin 1 is VBUS,
-        # pins 2/3 are intentionally unused USB2 data, pin 4 and pin 7 are GND,
-        # and CC1/CC2 each receive the required independent 5.1k pull-down.
-        wire(134.62, 92.71, 127.00, 92.71),
-        wire(127.00, 92.71, 127.00, 82.55),
-        wire(127.00, 92.71, 127.00, 96.52),
+        # J2 is the Akizuki 116895 power-only receptacle. Pin 1 is VBUS and
+        # pin 2 is GND. The part has no CC contacts, so it is for a USB-A
+        # source with an A-to-C cable, not a C-to-C source.
+        wire(134.62, 100.33, 127.00, 100.33),
+        wire(127.00, 100.33, 127.00, 96.52),
+        wire(127.00, 96.52, 127.00, 82.55),
         wire(127.00, 82.55, 146.05, 82.55),
-        wire(134.62, 102.87, 129.54, 102.87),
-        wire(121.92, 102.87, 119.38, 102.87),
-        wire(134.62, 105.41, 129.54, 105.41),
-        wire(121.92, 105.41, 119.38, 105.41),
 
         # +5 bus to U3 Vin; R8 driver resistor; C6
         wire(127.00, 96.52, 154.94, 96.52), wire(158.75, 96.52, 154.94, 96.52),
@@ -1925,10 +1903,6 @@ def build_schematic() -> None:
         wire(125.73, gnd_y, 299.72, gnd_y),
     ]
     root.extend(wire_block for wire_block in wires if wire_block)
-    root.extend([
-        no_connect(134.62, 95.25),
-        no_connect(134.62, 97.79),
-    ])
     wire_segments = parse_wire_segments(wires)
     seen_junctions: set[tuple[float, float]] = set()
     kept_junctions: list[tuple[float, float]] = []
@@ -2003,7 +1977,7 @@ def build_schematic() -> None:
         "",
         "Rule: retain wire-wire T/cross branches; do not place dots on component pin endpoints.",
         "Signal wiring is preserved while redundant J2/R8/R9 routing is removed and U3/C8 are not crossed.",
-        "J2 pin 1 is +5V VBUS; pins 2/3 are no-connect; pins 4/7 are GND; pins 5/6 use independent 5.1k CC pull-downs.",
+        "J2 pin 1 is +5V VBUS and pin 2 is GND; Akizuki 116895 has no CC contacts and therefore requires a USB-A source with an A-to-C cable.",
         "IPK sense is routed through a separate upper/right corridor instead of sharing the +5V Vin line.",
         "Internal helper labels remain electrically present at sub-pixel size only where direct wiring is not yet practical.",
         "",
@@ -2034,12 +2008,7 @@ def build_schematic() -> None:
         hidden_label("-13V8", 264.16, 104.14), hidden_label("-13V8", 278.13, 110.49),
         hidden_label("GND", 278.13, 118.11), hidden_label("GND", 274.32, 156.21),
         hidden_label("GND", 279.40, 184.15), hidden_label("DRIVER_DC", 153.67, 99.06),
-        hidden_label("GND", 134.62, 100.33),
-        hidden_label("USB_CC1", 134.62, 102.87),
-        hidden_label("USB_CC2", 134.62, 105.41),
-        hidden_label("GND", 134.62, 107.95),
-        hidden_label("GND", 119.38, 102.87, 180),
-        hidden_label("GND", 119.38, 105.41, 180),
+        hidden_label("GND", 134.62, 102.87),
         hidden_label("GND", 130.81, 109.22), hidden_label("+5V", 146.05, 99.06),
         hidden_label("+5V", 130.81, 101.60),
         hidden_label("GND", 299.72, 130.81), hidden_label("+5V", 130.81, 82.55),
@@ -2102,30 +2071,10 @@ def build_pcb(with_artwork: bool = True) -> None:
             if ref_match:
                 footprints[ref_match.group(1)] = block
     net_names = {match.group(2): match.group(1) for match in re.finditer(r'\(net\s+(\d+)\s+"([^"]*)"\)', source)}
-    next_net = max(int(number) for number in net_names.values()) + 1
-    new_net_declarations: list[str] = []
-    for name in ("USB_CC1", "USB_CC2"):
-        if name not in net_names:
-            net_names[name] = str(next_net)
-            new_net_declarations.append(f'\t(net {next_net} "{name}")\n')
-            next_net += 1
-    if new_net_declarations:
-        first_footprint = source.index('(footprint "')
-        source = (
-            source[:first_footprint]
-            + "".join(new_net_declarations)
-            + source[first_footprint:]
-        )
     explicit = {
         "D4": {"1": ("+13V8", "K"), "2": ("SW_NODE", "A")}, "D6": {"1": ("GND", "K"), "2": ("CPUMP_MID", "A")}, "D7": {"1": ("-13V8", "K"), "2": ("CPUMP_MID", "A")}, "D5": {"1": ("GND", "K"), "2": ("PWR_LED_P", "A")}, "D8": {"1": ("-13V8", "K"), "2": ("NEG_LED_N", "A")},
         "C9": {"1": ("SW_NODE", "+"), "2": ("CPUMP_MID", "-")},
-        "J2": {
-            "1": ("+5V", "VBUS"), "4": ("GND", "GND"),
-            "5": ("USB_CC1", "CC1"), "6": ("USB_CC2", "CC2"),
-            "7": ("GND", "GND"),
-        },
-        "R17": {"1": ("GND", "1"), "2": ("USB_CC1", "2")},
-        "R18": {"1": ("GND", "1"), "2": ("USB_CC2", "2")},
+        "J2": {"1": ("+5V", "VBUS"), "2": ("GND", "GND")},
     }
 
     def nets_for(ref: str) -> dict[str, dict[str, str]]:
@@ -2146,7 +2095,7 @@ def build_pcb(with_artwork: bool = True) -> None:
         # left, reserve a continuous routing aisle, and make the complete
         # switching/charge-pump section a compact right-side block.
         "U1": (KI_FOOTPRINTS / "Module.pretty/RaspberryPi_Pico_W_SMD_HandSolder.kicad_mod", "Module", "RaspberryPi_Pico_2W", (51, 38), 0),
-        "J2": (PROJECT_FOOTPRINTS / "AE_USB2.0_TYPE_C.kicad_mod", "Custom", "USB-C 5V INPUT", (17.7, 28), 90),
+        "J2": (PROJECT_FOOTPRINTS / "A295_CTRPB_1.kicad_mod", "Custom", "USB-C 5V INPUT", (3.4, 28.0), 90),
         "J3": (KI_FOOTPRINTS / "Connector_PinHeader_2.54mm.pretty/PinHeader_1x02_P2.54mm_Vertical.kicad_mod", "Connector_PinHeader_2.54mm", "CCFL_INVERTER_13V8", (110, 8), 0),
         "RV1": (KI_FOOTPRINTS / "Potentiometer_THT.pretty/Potentiometer_Runtron_RM-065_Vertical.kicad_mod", "Potentiometer_THT", "10k_CONTRAST_TRIM", (44, -54), 0),
         "U3": (KI_FOOTPRINTS / "Package_SO.pretty/SOIC-8_3.9x4.9mm_P1.27mm.kicad_mod", "Package_SO", "MC34063AD", (88, 24), 0),
@@ -2156,8 +2105,6 @@ def build_pcb(with_artwork: bool = True) -> None:
         "R10": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P2.54mm_Vertical.kicad_mod", "Resistor_THT", "1k 0.1%", (64, -54), 90),
         "R11": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P2.54mm_Vertical.kicad_mod", "Resistor_THT", "10k 0.1%", (88, -89), 90),
         "R16": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P2.54mm_Vertical.kicad_mod", "Resistor_THT", "10k 0.1%", (78, -56), 90),
-        "R17": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0204_L3.6mm_D1.6mm_P2.54mm_Vertical.kicad_mod", "Resistor_THT", "5.1k 1%", (12, 31), 0),
-        "R18": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0204_L3.6mm_D1.6mm_P2.54mm_Vertical.kicad_mod", "Resistor_THT", "5.1k 1%", (16, 31), 0),
         "L1": (KI_FOOTPRINTS / "Inductor_SMD.pretty/L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering.kicad_mod", "Inductor_SMD", "100uH", (89, 15), 0), "D4": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P2.54mm_Vertical_KathodeUp.kicad_mod", "Diode_THT", "1N5819", (106, 22), 180), "D6": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P2.54mm_Vertical_KathodeUp.kicad_mod", "Diode_THT", "1N5819", (102, 50), 90), "D7": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P2.54mm_Vertical_KathodeUp.kicad_mod", "Diode_THT", "1N5819", (115, 35), 180), "D5": (KI_FOOTPRINTS / "LED_THT.pretty/LED_D3.0mm.kicad_mod", "LED_THT", "GREEN LED 3mm", (116, 29), 90), "D8": (KI_FOOTPRINTS / "LED_THT.pretty/LED_D3.0mm.kicad_mod", "LED_THT", "RED LED 3mm", (106, 61), 90),
         "C6": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D8.0mm_P3.50mm.kicad_mod", "Capacitor_THT", "220uF 35V", (78, 25), 0), "C8": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "47uF 35V", (110, 23), 0), "C9": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V", (101, 29), 0), "C11": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V (+ to GND)", (115, 43), 0), "C7": (KI_FOOTPRINTS / "Capacitor_THT.pretty/C_Disc_D5.0mm_W2.5mm_P2.50mm.kicad_mod", "Capacitor_THT", "470pF 50V C0G", (82, 32), 0),
     }
@@ -2896,7 +2843,10 @@ def build_pcb(with_artwork: bool = True) -> None:
 
 
 def apply_generated_component_footprints(
-    references: set[str], added_references: set[str] | None = None
+    references: set[str],
+    added_references: set[str] | None = None,
+    removed_references: set[str] | None = None,
+    obsolete_net_names: set[str] | None = None,
 ) -> None:
     """Replace only selected PCB footprint instances from the reviewed candidate.
 
@@ -2920,6 +2870,8 @@ def apply_generated_component_footprints(
             cursor = end
 
     added_references = added_references or set()
+    removed_references = removed_references or set()
+    obsolete_net_names = obsolete_net_names or set()
     requested = references | added_references
     candidate_path = OUT / "pico_lta042b010f_carrier.kicad_pcb"
     candidate = candidate_path.read_text(encoding="utf-8")
@@ -2929,27 +2881,6 @@ def apply_generated_component_footprints(
         if reference in requested
     }
     target = SRC_PCB.read_text(encoding="utf-8")
-    target_net_names = {
-        match.group(2)
-        for match in re.finditer(r'\(net\s+(\d+)\s+"([^"]*)"\)', target)
-    }
-    candidate_net_blocks = {
-        match.group(2): match.group(0)
-        for match in re.finditer(r'\(net\s+(\d+)\s+"([^"]*)"\)', candidate)
-    }
-    missing_net_blocks = [
-        candidate_net_blocks[name]
-        for name in ("USB_CC1", "USB_CC2")
-        if name not in target_net_names
-    ]
-    if missing_net_blocks:
-        first_footprint = target.index('(footprint "')
-        target = (
-            target[:first_footprint]
-            + "\n".join(missing_net_blocks)
-            + "\n"
-            + target[first_footprint:]
-        )
     target_spans = footprint_spans(target)
     target_references = {reference for _, _, reference in target_spans}
     missing = requested - candidate_blocks.keys() | references - target_references
@@ -2962,11 +2893,12 @@ def apply_generated_component_footprints(
     cursor = 0
     for start, end, reference in target_spans:
         result.append(target[cursor:start])
-        result.append(
-            candidate_blocks[reference]
-            if reference in replace_references
-            else target[start:end]
-        )
+        if reference not in removed_references:
+            result.append(
+                candidate_blocks[reference]
+                if reference in replace_references
+                else target[start:end]
+            )
         cursor = end
     result.append(target[cursor:])
     output = "".join(result)
@@ -2976,8 +2908,17 @@ def apply_generated_component_footprints(
             candidate_blocks[reference] for reference in sorted(insert_references)
         )
         output = output[:first_footprint] + insertion + "\n\n" + output[first_footprint:]
+    for net_name in sorted(obsolete_net_names):
+        if output.count(f'"{net_name}"') == 1:
+            output = re.sub(
+                rf'\s*\(net\s+\d+\s+"{re.escape(net_name)}"\)',
+                "",
+                output,
+                count=1,
+            )
     SRC_PCB.write_text(output, encoding="utf-8")
-    print(f"applied component footprints: {', '.join(sorted(requested))}")
+    changed = requested | removed_references
+    print(f"applied component footprints: {', '.join(sorted(changed))}")
 
 
 if __name__ == "__main__":
@@ -2986,6 +2927,7 @@ if __name__ == "__main__":
     if "--apply-component-footprints" in sys.argv:
         apply_generated_component_footprints(
             {"J2", "R7", "R8", "R9", "R10", "R11", "R16", "D4", "D6", "D7"},
-            {"R17", "R18"},
+            removed_references={"R17", "R18"},
+            obsolete_net_names={"USB_CC1", "USB_CC2"},
         )
     print(OUT)
