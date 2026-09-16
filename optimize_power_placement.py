@@ -12,18 +12,17 @@ from pathlib import Path
 import pcbnew
 from place_power_stage import BOARD, PLACEMENT, xy
 
-MOVABLE = list(PLACEMENT)
-FIXED = ('J1', 'H1', 'H2')
+LOCKED = {'J2', 'J3', 'TP1', 'TP2', 'TP3', 'TP4'}
+MOVABLE = [reference for reference in PLACEMENT if reference not in LOCKED]
+FIXED = ('J1', 'H1', 'H2', *sorted(LOCKED))
 REGION = (0.4, 0.4, 26.6, 51.6)
 TOP_NOTCH = (25.0, 0.0, 26.6, 10.0)
 CLEARANCE = 0.15
 SWAP_GROUPS = [
-    ('R7', 'R9', 'R10', 'R11', 'R16'),
+    ('R7', 'R9', 'R10', 'R11', 'R16', 'R17', 'R18'),
     ('D4', 'D6', 'D7'),
     ('C8', 'C9', 'C11'),
     ('D5', 'D8'),
-    ('TP1', 'TP2', 'TP3', 'TP4'),
-    ('J2', 'J3'),
 ]
 LINKS = [
     ('U3.1', 'D4.2', 6), ('D4.1', 'C8.1', 5), ('C8.2', 'U3.2', 6),
@@ -33,7 +32,9 @@ LINKS = [
     ('R9.2', 'U3.5', 5), ('R10.1', 'U3.5', 5), ('R9.2', 'R10.1', 3),
     ('R10.2', 'U3.4', 1), ('R9.1', 'C8.1', 1),
     ('R8.2', 'U3.8', 3), ('R8.1', 'C6.1', 1),
-    ('J2.1', 'C6.1', 1), ('J2.2', 'C6.2', 1),
+    ('J2.1', 'C6.1', 2), ('J2.4', 'C6.2', 1), ('J2.7', 'C6.2', 1),
+    ('J2.5', 'R17.2', 4), ('R17.1', 'C6.2', 1),
+    ('J2.6', 'R18.2', 4), ('R18.1', 'C6.2', 1),
     ('J3.1', 'C8.1', 1), ('J3.2', 'C8.2', 1),
     ('C9.1', 'U3.1', 6), ('C9.2', 'D6.2', 5),
     ('C9.2', 'D7.2', 5), ('D7.1', 'C11.2', 5),
@@ -58,6 +59,7 @@ def main():
     ap.add_argument('--seed', type=int, default=8)
     ap.add_argument('--start', type=Path)
     ap.add_argument('--temperature', type=float, default=2000000)
+    ap.add_argument('--geometry-output', type=Path)
     args = ap.parse_args()
     rng = random.Random(args.seed)
     b = pcbnew.LoadBoard(str(BOARD))
@@ -78,10 +80,28 @@ def main():
                          [bb.GetX(), bb.GetY(), bb.GetRight(), bb.GetBottom()])
             pads = {p.GetNumber(): xy(p.GetPosition()) for p in f.Pads()}
             geom[ref, angle] = (rect, pads)
+    if args.geometry_output:
+        serialized = {
+            ref: {
+                str(angle): {
+                    'rect': geom[ref, angle][0],
+                    'pads': geom[ref, angle][1],
+                }
+                for angle in ANGLES
+            }
+            for ref in {*PLACEMENT, *FIXED}
+            if (ref, 0) in geom
+        }
+        args.geometry_output.parent.mkdir(parents=True, exist_ok=True)
+        args.geometry_output.write_text(json.dumps(serialized, indent=2) + '\n')
     state = {k: tuple(v) for k, v in PLACEMENT.items()}
     state.update({'J1': (37.75, 42.65, 180), 'H1': (4, 4, 0), 'H2': (4, 48, 0)})
     if args.start:
-        state.update({k: tuple(v) for k, v in json.loads(args.start.read_text()).items()})
+        state.update({
+            k: tuple(v)
+            for k, v in json.loads(args.start.read_text()).items()
+            if k in MOVABLE
+        })
     refs = list(state)
 
     def cost(state):
@@ -95,11 +115,11 @@ def main():
                 l, t, rr, bb = rects[ref]
                 excess = (max(REGION[0]-l, 0) + max(rr-REGION[2], 0)
                           + max(REGION[1]-t, 0) + max(bb-REGION[3], 0))
-                score += 1000000 * excess
+                score += 1000000000 * excess
                 notch_dx = max(0, min(rr, TOP_NOTCH[2]) - max(l, TOP_NOTCH[0]))
                 notch_dy = max(0, min(bb, TOP_NOTCH[3]) - max(t, TOP_NOTCH[1]))
                 if notch_dx > 0 and notch_dy > 0:
-                    score += 1000000 + 100000 * notch_dx * notch_dy
+                    score += 1000000000 + 100000000 * notch_dx * notch_dy
         for i, ref in enumerate(refs):
             for other in refs[i+1:]:
                 if ref not in MOVABLE and other not in MOVABLE:
@@ -109,11 +129,37 @@ def main():
                 dx = min(a[2], b[2]) - max(a[0], b[0]) + CLEARANCE
                 dy = min(a[3], b[3]) - max(a[1], b[1]) + CLEARANCE
                 if dx > 0 and dy > 0:
-                    score += 1000000 + 100000 * (min(dx, dy) + dx * dy)
+                    score += 1000000000 + 100000000 * (min(dx, dy) + dx * dy)
         for a, b, w in LINKS:
             score += math.dist(pads[a], pads[b]) * w * 25
         for a, b, limit in LIMITS:
             score += 5000 * max(0, math.dist(pads[a], pads[b]) - limit) ** 2
+        # External access constraints: the 13V header sits on any perimeter,
+        # while the four probe pads form one compact row on the bottom edge.
+        j3 = rects['J3']
+        j3_inset = min(
+            j3[0] - REGION[0], REGION[2] - j3[2],
+            j3[1] - REGION[1], REGION[3] - j3[3],
+        )
+        score += 200000 * max(0, j3_inset - 0.2) ** 2
+        tp_rects = [rects[f'TP{index}'] for index in range(1, 5)]
+        tp_centers = [
+            ((rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2)
+            for rect in tp_rects
+        ]
+        score += 200000 * sum(
+            max(0, REGION[3] - rect[3] - 0.2) ** 2 for rect in tp_rects
+        )
+        score += 100000 * (
+            max(center[1] for center in tp_centers)
+            - min(center[1] for center in tp_centers)
+        ) ** 2
+        score += 100000 * max(
+            0,
+            max(center[0] for center in tp_centers)
+            - min(center[0] for center in tp_centers)
+            - 12.25,
+        ) ** 2
         # Reserve a direct high-current corridor; sensitive components must not
         # occupy the proposed switch-node segment or its 1 mm surrounding band.
         for a, b in [('L1.2', 'U3.1'), ('D4.2', 'U3.1')]:

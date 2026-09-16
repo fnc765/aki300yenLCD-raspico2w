@@ -21,19 +21,19 @@ BOARD = ROOT / "pico_lta042b010f_carrier.kicad_pcb"
 # Coordinates in mm, KiCad rotation in degrees; each origin is the real footprint
 # origin (usually pad 1 for THT). Electrical component values remain unchanged.
 PLACEMENT = {
-    "J2": (11.25, 2.25, 90), "J3": (22.25, 35.5, 90),
-    "U3": (11.5, 32.75, 90), "L1": (18.0, 46.0, 180),
-    "C6": (17.25, 18.5, 90), "R7": (2.5, 41.5, 90),
-    "R8": (18.75, 23.5, 180), "D4": (9.25, 49.25, 90),
-    "C8": (16.25, 28.5, 0), "C7": (5.75, 39.25, 270),
-    "R9": (21.75, 22.25, 270), "R10": (14.0, 39.0, 0),
-    "C9": (9.75, 22.5, 90), "D6": (2.0, 10.5, 0),
-    "D7": (7.0, 36.0, 90), "C11": (18.25, 34.25, 180),
-    "R11": (25.0, 22.25, 270), "D5": (2.75, 26.0, 270),
-    "R16": (1.5, 14.25, 0), "D8": (5.25, 19.0, 180),
-    "RV1": (14.75, 6.0, 0), "TP1": (24.75, 16.0, 90),
-    "TP2": (23.0, 3.0, 90), "TP3": (10.5, 26.0, 90),
-    "TP4": (9.5, 5.75, 90),
+    "J2": (17.7, 28.0, 90), "J3": (2.25, 38.75, 180),
+    "U3": (23.0, 22.25, 90), "L1": (20.03, 41.3, 90),
+    "C6": (10.25, 37.0, 270), "R7": (22.25, 11.75, 270),
+    "R8": (4.75, 8.75, 0), "D4": (16.5, 32.5, 0),
+    "C8": (23.75, 32.25, 90), "C7": (13.25, 32.5, 180),
+    "R9": (15.75, 8.25, 0), "R10": (23.25, 8.0, 180),
+    "C9": (11.25, 6.0, 270), "D6": (4.75, 32.5, 0),
+    "D7": (13.0, 2.25, 180), "C11": (18.5, 3.5, 180),
+    "R11": (24.75, 50.0, 180), "D5": (22.75, 2.5, 270),
+    "R16": (4.25, 42.75, 180), "D8": (10.0, 47.0, 90),
+    "R17": (13.5, 46.75, 90), "R18": (24.0, 27.25, 180),
+    "TP1": (9.5, 50.0, 90), "TP2": (12.75, 50.0, 90),
+    "TP3": (16.0, 50.0, 90), "TP4": (19.25, 50.0, 90),
 }
 
 REGION = (0.4, 0.4, 26.6, 51.6)
@@ -43,64 +43,30 @@ CLEARANCE = 0.15
 
 
 def place_reference_fields(board):
-    """Keep horizontal identifiers outside pad/body courtyards and other text."""
-    layer = pcbnew.LSET()
-    layer.AddLayer(pcbnew.F_CrtYd)
-    fp = {f.GetReference(): f for f in board.GetFootprints()}
-    def box(rect):
-        return tuple(pcbnew.ToMM(v) for v in
-                     (rect.GetX(), rect.GetY(), rect.GetRight(), rect.GetBottom()))
-    body = {}
-    for ref, f in fp.items():
-        bounds = f.GetLayerBoundingBox(layer)
-        if bounds.GetWidth() > 0 and bounds.GetHeight() > 0:
-            body[ref] = box(bounds)
-        else:
-            objects = list(f.Pads()) + [g for g in f.GraphicalItems()
-                                       if isinstance(g, pcbnew.PCB_SHAPE) and g.GetLayer() == pcbnew.F_SilkS]
-            boxes = [box(g.GetBoundingBox()) for g in objects]
-            body[ref] = (min(bb[0] for bb in boxes), min(bb[1] for bb in boxes),
-                         max(bb[2] for bb in boxes), max(bb[3] for bb in boxes))
-    placed = [box(f.Reference().GetBoundingBox()) for ref, f in fp.items() if ref not in PLACEMENT]
-    crowded = ['U3', 'C7', 'R8', 'R10', 'R9', 'R7', 'D4', 'C6', 'C8']
-    order = crowded + sorted(set(PLACEMENT) - set(crowded))
-    def overlap(a, b):
-        dx = min(a[2], b[2]) - max(a[0], b[0]) + 0.15
-        dy = min(a[3], b[3]) - max(a[1], b[1]) + 0.15
-        return max(dx, 0) * max(dy, 0)
-    for ref in order:
-        field = fp[ref].Reference()
-        l, t, r, b = body[ref]
-        cx, cy = (l+r)/2, (t+b)/2
-        best = None
-        for font in [0.85, 0.8]:
-            field.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(font), pcbnew.FromMM(font)))
-            field.SetTextAngle(pcbnew.EDA_ANGLE(0, pcbnew.DEGREES_T))
-            width = len(ref) * font * 0.8
-            for gap in [0.7, 1.1, 1.6, 2.2, 3.0]:
-                candidates = [(cx, t-gap), (cx, b+gap), (l-gap-width/2, cy), (r+gap+width/2, cy)]
-                for shift in [-2, 2]:
-                    candidates += [(cx+shift,t-gap),(cx+shift,b+gap)]
-                for x, y in candidates:
-                    field.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x), pcbnew.FromMM(y)))
-                    bounds = box(field.GetBoundingBox())
-                    outside = (max(REGION[0]-bounds[0], 0)
-                               + max(bounds[2]-REGION[2], 0)
-                               + max(REGION[1]-bounds[1], 0)
-                               + max(bounds[3]-REGION[3], 0))
-                    notch_dx = max(0, min(bounds[2], TOP_NOTCH[2])
-                                   - max(bounds[0], TOP_NOTCH[0]))
-                    notch_dy = max(0, min(bounds[3], TOP_NOTCH[3])
-                                   - max(bounds[1], TOP_NOTCH[1]))
-                    outside += 10 * notch_dx * notch_dy
-                    penalty = 10000 * (outside + sum(overlap(bounds, bb) for bb in body.values()) + sum(overlap(bounds,bb) for bb in placed))
-                    score = penalty + math.dist((x,y),(cx,cy)) + 8*(0.85-font)
-                    if best is None or score < best[0]:
-                        best = (score,x,y,font)
-        _, x, y, font = best
-        field.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(font),pcbnew.FromMM(font)))
-        field.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(x),pcbnew.FromMM(y)))
-        placed.append(box(field.GetBoundingBox()))
+    """Keep dense power-stage references on fabrication, not crowded silkscreen."""
+    footprints = {f.GetReference(): f for f in board.GetFootprints()}
+    for ref in PLACEMENT:
+        footprint = footprints[ref]
+        field = footprint.Reference()
+        field.SetLayer(pcbnew.F_Fab)
+        field.SetPosition(footprint.GetPosition())
+        field.SetTextAngle(pcbnew.EDA_ANGLE(0, pcbnew.DEGREES_T))
+        field.SetTextSize(
+            pcbnew.VECTOR2I(pcbnew.FromMM(0.8), pcbnew.FromMM(0.8))
+        )
+
+
+def place_diode_polarity_markers(board):
+    """Keep crowded vertical-diode cathode marks on fabrication only."""
+    footprints = {f.GetReference(): f for f in board.GetFootprints()}
+    for ref in ("D4", "D7"):
+        for item in footprints[ref].GraphicalItems():
+            if (
+                isinstance(item, pcbnew.PCB_TEXT)
+                and item.GetLayer() == pcbnew.F_SilkS
+                and item.GetText() == "K"
+            ):
+                item.SetLayer(pcbnew.F_Fab)
 
 
 def validate_red_zone(board):
@@ -137,6 +103,23 @@ def validate_red_zone(board):
         for fixed in FIXED_REFERENCES:
             if overlap(boxes[ref], bounds(fixed), CLEARANCE):
                 errors.append(f"{ref}/{fixed} courtyards overlap")
+    j2 = boxes["J2"]
+    if abs(j2[0] - REGION[0]) > 0.11:
+        errors.append(f"J2 USB opening is not aligned to the left perimeter: {j2}")
+    j3 = boxes["J3"]
+    j3_inset = min(
+        j3[0] - REGION[0], REGION[2] - j3[2],
+        j3[1] - REGION[1], REGION[3] - j3[3],
+    )
+    if j3_inset > 0.25:
+        errors.append(f"J3 is not on the red-zone perimeter: {j3}")
+    tp_boxes = [boxes[f"TP{index}"] for index in range(1, 5)]
+    if max(box[3] for box in tp_boxes) - min(box[3] for box in tp_boxes) > 0.25:
+        errors.append("TP1-TP4 are not aligned as one perimeter group")
+    if max(REGION[3] - box[3] for box in tp_boxes) > 0.25:
+        errors.append("TP1-TP4 are not on the bottom perimeter")
+    if max(box[2] for box in tp_boxes) - min(box[0] for box in tp_boxes) > 14.5:
+        errors.append("TP1-TP4 are not sufficiently grouped")
     if errors:
         raise AssertionError("Red-zone validation failed:\n" + "\n".join(errors))
     return boxes
@@ -247,6 +230,7 @@ def main():
         text.SetTextSize(pcbnew.VECTOR2I(pcbnew.FromMM(0.85), pcbnew.FromMM(0.85)))
         text.SetTextThickness(pcbnew.FromMM(0.13))
     place_reference_fields(board)
+    place_diode_polarity_markers(board)
     # Legacy block-divider silk lines and off-board draft notes describe the old
     # placement. Retain them as editable drawing annotations, not printed silk.
     changed_graphics = set()
