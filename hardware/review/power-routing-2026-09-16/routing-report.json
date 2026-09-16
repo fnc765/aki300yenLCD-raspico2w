@@ -1,0 +1,848 @@
+{
+  "source": ".codex-power-route\\pipeline-placement.kicad_pcb",
+  "output": ".codex-power-route\\pipeline-routed.kicad_pcb",
+  "input_sha256": "8c5bb01e7136ce788cdcf154ec254e4444279d66bf1ac1b573bb43d6874669f9",
+  "scope": "power-stage-only",
+  "ground_zone": {
+    "name": "POWER_STAGE_GND",
+    "layer": "B.Cu",
+    "polygon_mm": [
+      [
+        0.6,
+        0.6
+      ],
+      [
+        24.9,
+        0.6
+      ],
+      [
+        24.9,
+        51.4
+      ],
+      [
+        0.6,
+        51.4
+      ]
+    ]
+  },
+  "routes": [
+    {
+      "name": "switch-power-loop",
+      "net": "SW_NODE",
+      "layer": "F.Cu",
+      "width_mm": 1.0,
+      "points_mm": [
+        [
+          12.55,
+          15.25
+        ],
+        [
+          12.55,
+          20.79
+        ],
+        [
+          8.5,
+          20.79
+        ],
+        [
+          10.3,
+          22.6
+        ],
+        [
+          10.3,
+          24.845
+        ],
+        [
+          11.475,
+          24.845
+        ]
+      ]
+    },
+    {
+      "name": "switch-charge-pump",
+      "net": "SW_NODE",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          11.475,
+          24.845
+        ],
+        [
+          10.0,
+          24.845
+        ],
+        [
+          9.5,
+          26.0
+        ],
+        [
+          9.5,
+          28.0
+        ],
+        [
+          10.0,
+          29.5
+        ],
+        [
+          10.0,
+          35.5
+        ],
+        [
+          7.75,
+          35.5
+        ]
+      ]
+    },
+    {
+      "name": "peak-current-path",
+      "net": "IPK_SENSE",
+      "layer": "F.Cu",
+      "width_mm": 1.0,
+      "points_mm": [
+        [
+          21.95,
+          15.25
+        ],
+        [
+          19.42,
+          22.75
+        ],
+        [
+          18.3,
+          26.115
+        ],
+        [
+          16.425,
+          26.115
+        ]
+      ]
+    },
+    {
+      "name": "boost-output-hot-loop",
+      "net": "+13V8",
+      "layer": "F.Cu",
+      "width_mm": 1.0,
+      "points_mm": [
+        [
+          8.5,
+          18.25
+        ],
+        [
+          3.75,
+          18.5
+        ]
+      ]
+    },
+    {
+      "name": "usb-input-trunk",
+      "net": "+5V",
+      "layer": "B.Cu",
+      "width_mm": 1.0,
+      "points_mm": [
+        [
+          7.19,
+          26.185
+        ],
+        [
+          8.0,
+          25.0
+        ],
+        [
+          13.5,
+          25.0
+        ]
+      ]
+    },
+    {
+      "name": "input-capacitor",
+      "net": "+5V",
+      "layer": "B.Cu",
+      "width_mm": 1.0,
+      "points_mm": [
+        [
+          13.5,
+          25.0
+        ],
+        [
+          14.5,
+          26.5
+        ],
+        [
+          14.5,
+          27.3
+        ],
+        [
+          9.5,
+          27.3
+        ],
+        [
+          9.5,
+          38.0
+        ],
+        [
+          12.0,
+          39.0
+        ],
+        [
+          15.0,
+          40.0
+        ]
+      ]
+    },
+    {
+      "name": "input-current-limit",
+      "net": "+5V",
+      "layer": "B.Cu",
+      "width_mm": 1.0,
+      "points_mm": [
+        [
+          13.5,
+          25.0
+        ],
+        [
+          11.5,
+          25.0
+        ],
+        [
+          11.5,
+          19.0
+        ],
+        [
+          24.5,
+          19.0
+        ],
+        [
+          24.5,
+          22.75
+        ]
+      ]
+    },
+    {
+      "name": "input-regulator-vcc",
+      "net": "+5V",
+      "layer": "B.Cu",
+      "width_mm": 1.0,
+      "points_mm": [
+        [
+          14.5,
+          26.5
+        ],
+        [
+          14.5,
+          27.385
+        ],
+        [
+          18.0,
+          27.385
+        ]
+      ]
+    },
+    {
+      "name": "input-regulator-vcc-neck",
+      "net": "+5V",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          18.0,
+          27.385
+        ],
+        [
+          16.425,
+          27.385
+        ]
+      ]
+    },
+    {
+      "name": "driver-bias",
+      "net": "+5V",
+      "layer": "B.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          24.5,
+          22.75
+        ],
+        [
+          25.8,
+          22.75
+        ],
+        [
+          25.8,
+          30.8
+        ],
+        [
+          25.4,
+          30.8
+        ]
+      ]
+    },
+    {
+      "name": "input-test-point-back",
+      "net": "+5V",
+      "layer": "B.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          15.0,
+          40.0
+        ],
+        [
+          12.0,
+          40.0
+        ],
+        [
+          9.5,
+          47.0
+        ]
+      ]
+    },
+    {
+      "name": "input-test-point-front",
+      "net": "+5V",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          9.5,
+          47.0
+        ],
+        [
+          9.5,
+          50.0
+        ]
+      ]
+    },
+    {
+      "name": "positive-output-terminal",
+      "net": "+13V8",
+      "layer": "B.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          3.75,
+          18.5
+        ],
+        [
+          5.3,
+          18.5
+        ],
+        [
+          5.3,
+          38.75
+        ],
+        [
+          2.25,
+          38.75
+        ]
+      ]
+    },
+    {
+      "name": "positive-output-test",
+      "net": "+13V8",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          2.25,
+          38.75
+        ],
+        [
+          4.5,
+          43.5
+        ],
+        [
+          12.75,
+          43.5
+        ],
+        [
+          12.75,
+          50.0
+        ]
+      ]
+    },
+    {
+      "name": "positive-output-sense-front",
+      "net": "+13V8",
+      "layer": "F.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          8.5,
+          18.25
+        ],
+        [
+          7.0,
+          16.0
+        ],
+        [
+          7.0,
+          11.0
+        ],
+        [
+          18.0,
+          11.0
+        ],
+        [
+          18.0,
+          20.5
+        ]
+      ]
+    },
+    {
+      "name": "positive-output-sense-back-a",
+      "net": "+13V8",
+      "layer": "B.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          18.0,
+          20.5
+        ],
+        [
+          22.5,
+          20.5
+        ],
+        [
+          22.5,
+          24.5
+        ],
+        [
+          23.0,
+          24.5
+        ]
+      ]
+    },
+    {
+      "name": "positive-output-sense-bridge",
+      "net": "+13V8",
+      "layer": "F.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          23.0,
+          24.5
+        ],
+        [
+          23.0,
+          27.0
+        ]
+      ]
+    },
+    {
+      "name": "positive-output-sense-back-b",
+      "net": "+13V8",
+      "layer": "B.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          23.0,
+          27.0
+        ],
+        [
+          23.0,
+          32.5
+        ],
+        [
+          21.25,
+          32.5
+        ]
+      ]
+    },
+    {
+      "name": "positive-indicator-feed",
+      "net": "+13V8",
+      "layer": "F.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          3.75,
+          18.5
+        ],
+        [
+          3.25,
+          14.75
+        ]
+      ]
+    },
+    {
+      "name": "timing-control",
+      "net": "TC_TIMING",
+      "layer": "F.Cu",
+      "width_mm": 0.25,
+      "points_mm": [
+        [
+          11.475,
+          27.385
+        ],
+        [
+          12.8,
+          27.385
+        ],
+        [
+          12.8,
+          31.5
+        ],
+        [
+          12.25,
+          31.5
+        ]
+      ]
+    },
+    {
+      "name": "feedback-upper",
+      "net": "VFB",
+      "layer": "F.Cu",
+      "width_mm": 0.25,
+      "points_mm": [
+        [
+          16.425,
+          28.655
+        ],
+        [
+          17.8,
+          29.5
+        ],
+        [
+          18.71,
+          32.5
+        ]
+      ]
+    },
+    {
+      "name": "feedback-lower",
+      "net": "VFB",
+      "layer": "F.Cu",
+      "width_mm": 0.25,
+      "points_mm": [
+        [
+          18.71,
+          32.5
+        ],
+        [
+          20.0,
+          34.0
+        ],
+        [
+          20.0,
+          36.0
+        ],
+        [
+          21.0,
+          36.0
+        ]
+      ]
+    },
+    {
+      "name": "driver-discharge-front",
+      "net": "DRIVER_DC",
+      "layer": "F.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          16.425,
+          24.845
+        ],
+        [
+          17.5,
+          24.845
+        ]
+      ]
+    },
+    {
+      "name": "driver-discharge-back",
+      "net": "DRIVER_DC",
+      "layer": "B.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          17.5,
+          24.845
+        ],
+        [
+          18.5,
+          25.5
+        ],
+        [
+          24.0,
+          25.5
+        ],
+        [
+          24.0,
+          33.34
+        ],
+        [
+          25.4,
+          33.34
+        ]
+      ]
+    },
+    {
+      "name": "charge-pump-clamp",
+      "net": "CPUMP_MID",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          7.75,
+          37.5
+        ],
+        [
+          6.21,
+          41.25
+        ]
+      ]
+    },
+    {
+      "name": "charge-pump-rectifier",
+      "net": "CPUMP_MID",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          7.75,
+          37.5
+        ],
+        [
+          11.0,
+          37.5
+        ],
+        [
+          14.5,
+          35.5
+        ],
+        [
+          15.75,
+          33.79
+        ]
+      ]
+    },
+    {
+      "name": "negative-output-capacitor",
+      "net": "-13V8",
+      "layer": "B.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          15.75,
+          31.25
+        ],
+        [
+          15.75,
+          29.0
+        ],
+        [
+          21.0,
+          29.0
+        ]
+      ]
+    },
+    {
+      "name": "negative-indicator-feed",
+      "net": "-13V8",
+      "layer": "F.Cu",
+      "width_mm": 0.2,
+      "points_mm": [
+        [
+          21.0,
+          29.0
+        ],
+        [
+          24.8,
+          29.0
+        ],
+        [
+          26.0,
+          27.5
+        ],
+        [
+          26.0,
+          11.0
+        ],
+        [
+          24.4,
+          10.8
+        ],
+        [
+          23.0,
+          10.2
+        ],
+        [
+          20.5,
+          6.5
+        ]
+      ]
+    },
+    {
+      "name": "negative-test-point",
+      "net": "-13V8",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          21.0,
+          29.0
+        ],
+        [
+          23.5,
+          29.0
+        ],
+        [
+          23.5,
+          43.0
+        ],
+        [
+          16.0,
+          46.0
+        ],
+        [
+          16.0,
+          50.0
+        ]
+      ]
+    },
+    {
+      "name": "negative-led",
+      "net": "NEG_LED_N",
+      "layer": "F.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          23.04,
+          6.5
+        ],
+        [
+          20.5,
+          2.0
+        ]
+      ]
+    },
+    {
+      "name": "positive-led",
+      "net": "PWR_LED_P",
+      "layer": "F.Cu",
+      "width_mm": 0.3,
+      "points_mm": [
+        [
+          3.25,
+          12.21
+        ],
+        [
+          8.96,
+          7.0
+        ]
+      ]
+    },
+    {
+      "name": "ground-test-point-back",
+      "net": "GND",
+      "layer": "B.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          15.0,
+          43.5
+        ],
+        [
+          21.0,
+          44.5
+        ],
+        [
+          19.25,
+          47.0
+        ]
+      ]
+    },
+    {
+      "name": "ground-test-point-front",
+      "net": "GND",
+      "layer": "F.Cu",
+      "width_mm": 0.6,
+      "points_mm": [
+        [
+          19.25,
+          47.0
+        ],
+        [
+          19.25,
+          50.0
+        ]
+      ]
+    }
+  ],
+  "vias": [
+    {
+      "name": "regulator-vcc-via",
+      "net": "+5V",
+      "position_mm": [
+        18.0,
+        27.385
+      ]
+    },
+    {
+      "name": "driver-via",
+      "net": "DRIVER_DC",
+      "position_mm": [
+        17.5,
+        24.845
+      ]
+    },
+    {
+      "name": "positive-sense-via-a",
+      "net": "+13V8",
+      "position_mm": [
+        18.0,
+        20.5
+      ]
+    },
+    {
+      "name": "positive-sense-via-b",
+      "net": "+13V8",
+      "position_mm": [
+        23.0,
+        24.5
+      ]
+    },
+    {
+      "name": "positive-sense-via-c",
+      "net": "+13V8",
+      "position_mm": [
+        23.0,
+        27.0
+      ]
+    },
+    {
+      "name": "input-test-via",
+      "net": "+5V",
+      "position_mm": [
+        9.5,
+        47.0
+      ]
+    },
+    {
+      "name": "ground-test-via",
+      "net": "GND",
+      "position_mm": [
+        19.25,
+        47.0
+      ]
+    },
+    {
+      "name": "power-ground-via",
+      "net": "GND",
+      "position_mm": [
+        11.475,
+        26.115
+      ]
+    },
+    {
+      "name": "quiet-ground-via",
+      "net": "GND",
+      "position_mm": [
+        11.475,
+        28.655
+      ]
+    }
+  ]
+}

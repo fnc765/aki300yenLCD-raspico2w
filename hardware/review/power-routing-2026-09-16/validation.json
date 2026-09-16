@@ -1,0 +1,27 @@
+{
+  "scope": "power-stage-only",
+  "erc_violations": 0,
+  "drc_violations": 13,
+  "drc_unconnected_items": 47,
+  "power_stage_unconnected_items": 0,
+  "power_stage_shorting_items": 0,
+  "power_stage_tracks_crossing": 0,
+  "power_stage_clearance_violations": 0,
+  "power_stage_hole_clearance_violations": 0,
+  "power_stage_copper_edge_clearance_violations": 0,
+  "power_stage_track_dangling": 0,
+  "track_segments": 87,
+  "vias": 9,
+  "ground_zone": "POWER_STAGE_GND on B.Cu",
+  "pico_u1_footprint_unchanged": true,
+  "lcd_j1_footprint_unchanged": true,
+  "pico_and_lcd_routing_deferred": true,
+  "remaining_drc_types": {
+    "lib_footprint_mismatch": 8,
+    "silk_edge_clearance": 2,
+    "items_not_allowed": 1,
+    "lib_footprint_issues": 1,
+    "silk_overlap": 1
+  },
+  "note": "All 47 remaining unconnected items are outside the routed power-stage references and belong to the deliberately deferred Pico/LCD side."
+}
