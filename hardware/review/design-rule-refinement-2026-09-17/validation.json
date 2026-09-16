@@ -1,0 +1,42 @@
+{
+  "scope": "board-edge-routing-and-design-rule-refinement",
+  "assumption": "generic low-cost two-layer 1 oz copper PCB",
+  "before_drc_violations": 25,
+  "before_copper_edge_clearance_violations": 12,
+  "after_erc_violations": 0,
+  "after_drc_violations": 13,
+  "after_drc_unconnected_items": 0,
+  "after_copper_edge_clearance_violations": 0,
+  "after_shorting_items": 0,
+  "after_tracks_crossing": 0,
+  "after_clearance_violations": 0,
+  "after_hole_clearance_violations": 0,
+  "after_hole_to_hole_violations": 0,
+  "after_track_dangling": 0,
+  "after_via_dangling": 0,
+  "after_solder_mask_bridge": 0,
+  "rules_mm": {
+    "minimum_clearance": 0.2,
+    "minimum_track_width": 0.2,
+    "minimum_connection_width": 0.2,
+    "global_copper_to_edge": 0.5,
+    "track_and_via_to_edge": 1.0,
+    "minimum_hole_clearance": 0.25,
+    "minimum_hole_to_hole": 0.25,
+    "minimum_via_diameter": 0.5,
+    "minimum_via_drill": 0.3,
+    "default_via_diameter": 0.6,
+    "default_via_drill": 0.3,
+    "logic_ground_zone_to_outer_edge": 1.0,
+    "power_ground_zone_to_outer_edge": 0.6
+  },
+  "remaining_drc_types": {
+    "lib_footprint_mismatch": 9,
+    "silk_edge_clearance": 2,
+    "items_not_allowed": 1,
+    "silk_overlap": 1
+  },
+  "remaining_items_note": "All remaining DRC items are non-routing issues. The items_not_allowed entry is the pre-existing H3 footprint in the Pico RF keepout.",
+  "ground_zone_note": "The power-stage GND pour remains 0.6 mm from the outer edge because a 1.0 mm inset splits its return path around the edge-mounted +13 V terminal. The global 0.5 mm copper-edge rule still applies.",
+  "hardware_validation": "not performed"
+}

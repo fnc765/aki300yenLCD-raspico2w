@@ -44,3 +44,7 @@ ERC/DRC JSON, validation summary, KiCad SVG, and KiCad 3D render.
 These checks validate the design files, not operation on assembled hardware.
 LCD timing margin, display quality, power-rail ripple, temperature, and EMI
 remain unmeasured.
+
+The follow-up [design-rule and board-edge refinement](design-rule-refinement.md)
+adds a 1.0 mm edge margin for ordinary tracks and vias and records the updated
+DRC evidence.

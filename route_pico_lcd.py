@@ -136,7 +136,10 @@ def finish_right_signal(net_name, channel_x, turn_y, target):
 for index, (net_name, j1_pad, u1_pad, right_gap) in enumerate(down_signals):
     source = pad("J1", j1_pad)
     target = pad("U1", u1_pad)
-    lane_y = round(51.0 - 0.6 * index, 3)
+    # Keep the lower fanout comfortably inside the routed board edge.  The
+    # closest track centre is 1.5 mm from the edge, leaving 1.4 mm of copper
+    # clearance for a 0.2 mm trace.
+    lane_y = round(50.5 - 0.55 * index, 3)
     channel_x = round(48.8 + 0.8 * index, 3)
     breakout = [channel_x, lane_y]
     add_route(f"{net_name}-j1-breakout", net_name, "F.Cu", 0.2,
@@ -178,7 +181,7 @@ for net_name, j1_pad, u1_pad, lane_y, channel_x in up_signals:
               [turn, target])
 
 for net_name, j1_pad, u1_pad, source_x, lane_y, bridge_x, dogleg_y, channel_x in (
-    ("LCD_R4", 23, 20, 34.0, 11.9, 54.2, 13.2, 64.6),
+    ("LCD_R4", 23, 20, 34.0, 12.1, 54.2, 13.2, 64.6),
     ("LCD_R5", 22, 19, 35.0, 12.7, 53.4, 14.9, 63.8),
 ):
     source = pad("J1", j1_pad)
@@ -236,7 +239,7 @@ add_route("3v3-j1-join-a", "+3V3", "F.Cu", 0.6,
 add_via("3v3-trunk-via", "+3V3", [37.0, 34.0])
 add_route("3v3-trimmer-trunk", "+3V3", "B.Cu", 0.6,
           [[37.0, 34.0], [44.0, 34.0], [44.0, 11.8],
-           [51.0, 11.8], [51.0, 5.41], [53.5, 5.41], pad("RV1", 1)])
+           [51.3, 11.8], [51.3, 5.41], [53.5, 5.41], pad("RV1", 1)])
 add_route("3v3-pico-right", "+3V3", "B.Cu", 0.6,
           [[53.5, 5.41], [61.0, 5.41], [61.0, 8.0],
            [88.0, 8.0], [88.0, 11.76], [85.9, 11.76]])
@@ -253,12 +256,12 @@ add_route("5v-pico-channel", "+5V", "F.Cu", 0.6,
           [[25.5, 37.0], [28.5, 34.0], [28.5, 14.5]])
 add_via("5v-pico-upper-via", "+5V", [28.5, 14.5])
 add_route("5v-pico-notch-crossing", "+5V", "B.Cu", 0.6,
-          [[28.5, 14.5], [28.5, 10.85]])
-add_via("5v-pico-lower-via", "+5V", [28.5, 10.85])
+          [[28.5, 14.5], [28.5, 11.3]])
+add_via("5v-pico-lower-via", "+5V", [28.5, 11.3])
 add_route("5v-pico-left", "+5V", "F.Cu", 0.6,
-          [[28.5, 10.85], [63.0, 10.85]])
+          [[28.5, 11.3], [51.5, 11.3], [51.5, 10.49], [63.0, 10.49]])
 add_route("5v-pico-neck", "+5V", "F.Cu", 0.3,
-          [[63.0, 10.85], [63.0, 10.49], [67.0, 10.49]])
+          [[63.0, 10.49], [67.0, 10.49]])
 add_via("5v-pico-inner-via", "+5V", [67.0, 10.49])
 add_route("5v-u1", "+5V", "B.Cu", 0.6,
           [[67.0, 10.49], [86.8, 10.49]])
@@ -350,7 +353,7 @@ logic_ground.SetMinThickness(pcbnew.FromMM(0.25))
 logic_ground.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
 outline = logic_ground.Outline()
 outline.NewOutline()
-for xy in ([24.5, 0.6], [99.4, 0.6], [99.4, 51.4], [24.5, 51.4]):
+for xy in ([24.5, 1.0], [99.0, 1.0], [99.0, 51.0], [24.5, 51.0]):
     outline.Append(point(xy))
 board.Add(logic_ground)
 
@@ -368,7 +371,7 @@ report = {
     "ground_zone": {
         "name": "LOGIC_GND",
         "layer": "B.Cu",
-        "polygon_mm": [[24.5, 0.6], [99.4, 0.6], [99.4, 51.4], [24.5, 51.4]],
+        "polygon_mm": [[24.5, 1.0], [99.0, 1.0], [99.0, 51.0], [24.5, 51.0]],
     },
 }
 if args.report:

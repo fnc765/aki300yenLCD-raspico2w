@@ -1,0 +1,9 @@
+(version 1)
+
+# The fab minimum remains 0.5 mm in Board Setup so edge connectors and pads can
+# use their intentional mechanical exceptions.  Ordinary routed copper gets a
+# wider production/handling margin; zones retain the global rule so the power
+# ground return is not split by the edge-mounted +13 V terminal.
+(rule "Routed copper edge margin"
+  (condition "A.Type == 'Track' || A.Type == 'Via'")
+  (constraint edge_clearance (min 1.0mm)))
