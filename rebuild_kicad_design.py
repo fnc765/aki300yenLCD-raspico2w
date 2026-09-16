@@ -218,19 +218,19 @@ AKIZUKI_COMPONENT_FIELDS: dict[str, dict[str, str]] = {
     },
     "D5": {
         "Manufacturer": "OptoSupply",
-        "MPN": "OSG50805C1C",
-        "AkizukiCode": "106423",
+        "MPN": "OSG5TA3Z74A",
+        "AkizukiCode": "111635",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g106423/",
-        "SelectionNote": "green LED; 2012/0805 SMD; hand-solderable",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g111635/",
+        "SelectionNote": "green 3mm bullet LED; radial through-hole; 2.54mm pitch",
     },
     "D8": {
         "Manufacturer": "OptoSupply",
-        "MPN": "OSR50805C1C",
-        "AkizukiCode": "106419",
+        "MPN": "OSR5JA3Z74A",
+        "AkizukiCode": "111577",
         "Supplier": "Akizuki Denshi",
-        "SourceURL": "https://akizukidenshi.com/catalog/g/g106419/",
-        "SelectionNote": "red LED; 2012/0805 SMD; hand-solderable",
+        "SourceURL": "https://akizukidenshi.com/catalog/g/g111577/",
+        "SelectionNote": "red 3mm bullet LED; radial through-hole; 2.54mm pitch",
     },
     "RV1": {
         "Manufacturer": "SUNTAN TECHNOLOGY CO LTD",
@@ -1555,12 +1555,12 @@ def build_schematic() -> None:
         ("R10", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (208.28, 115.57), 0, "1k 0.1%"),
         ("C8", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (190.50, 93.98), 0, "47uF 35V"),
         ("R11", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (224.79, 93.98), 0, "10k 0.1%"),
-        ("D5", "Device:LED", "LED_SMD:LED_0805_2012Metric", (224.79, 106.68), 90, "GREEN LED"),
+        ("D5", "Device:LED", "LED_THT:LED_D3.0mm", (224.79, 106.68), 90, "GREEN LED 3mm"),
         ("C9", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (242.57, 96.52), 0, "10uF 50V"),
         ("D7", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (260.35, 104.14), 180, "1N5819"),
         ("D6", "Device:D_Schottky", "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal", (247.65, 114.30), 90, "1N5819"),
         ("C11", "Device:C_Polarized", "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm", (278.13, 114.30), 180, "10uF 50V"),
-        ("D8", "Device:LED", "LED_SMD:LED_0805_2012Metric", (299.72, 114.30), 270, "RED LED"),
+        ("D8", "Device:LED", "LED_THT:LED_D3.0mm", (299.72, 114.30), 270, "RED LED 3mm"),
         ("R16", "Device:R", "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal", (299.72, 127.00), 0, "10k 0.1%"),
         ("RV1", "Device:R_Potentiometer", "Potentiometer_THT:Potentiometer_Runtron_RM-065_Vertical", (279.40, 180.34), 0, "10k TRIM"),
     ]
@@ -1800,13 +1800,17 @@ def build_schematic() -> None:
 
         # +13 rail and positive LED. Stop the rail at the last actual branch;
         # the previous extension to x=299.72 was a visually dangling wire.
-        wire(184.15, 82.55, 242.57, 82.55), wire(190.50, 90.17, 190.50, 82.55),
+        wire(184.15, 82.55, 224.79, 82.55), wire(190.50, 90.17, 190.50, 82.55),
         wire(190.50, 97.79, 190.50, gnd_y), wire(208.28, 90.17, 208.28, 82.55),
         wire(224.79, 90.17, 224.79, 82.55), wire(224.79, 97.79, 224.79, 102.87),
         wire(224.79, 110.49, 224.79, gnd_y),
 
-        # C9 / D7 charge-pump midpoint and negative rail
-        wire(242.57, 92.71, 242.57, 82.55), wire(242.57, 100.33, 242.57, 104.14),
+        # C9 is AC-coupled from SW_NODE.  Route it above the +13V8 rail so
+        # the two nets never cross, then keep the charge-pump midpoint local.
+        wire(172.72, 82.55, 172.72, 76.20),
+        wire(172.72, 76.20, 242.57, 76.20),
+        wire(242.57, 76.20, 242.57, 92.71),
+        wire(242.57, 100.33, 242.57, 104.14),
         wire(242.57, 104.14, 256.54, 104.14), wire(247.65, 104.14, 247.65, 110.49),
         wire(247.65, 118.11, 247.65, gnd_y), wire(264.16, 104.14, 299.72, 104.14),
         wire(278.13, 104.14, 278.13, 110.49), wire(278.13, 118.11, 278.13, gnd_y),
@@ -1861,7 +1865,7 @@ def build_schematic() -> None:
         (187.96, gnd_y), (182.88, 109.22), (195.58, 109.22), (195.58, 116.84),
         (208.28, 116.84), (208.28, gnd_y), (184.15, 82.55), (190.50, 82.55),
         (190.50, gnd_y), (208.28, 82.55), (224.79, 82.55), (224.79, 102.87),
-        (224.79, gnd_y), (242.57, 82.55), (242.57, 104.14), (247.65, 104.14),
+        (224.79, gnd_y), (172.72, 82.55), (242.57, 104.14), (247.65, 104.14),
         (247.65, gnd_y), (256.54, 104.14), (264.16, 104.14), (278.13, 104.14),
         (278.13, gnd_y), (299.72, 104.14), (299.72, 110.49), (299.72, 118.11),
         (299.72, 123.19), (299.72, gnd_y), (270.51, 153.67), (270.51, 151.13),
@@ -1923,7 +1927,7 @@ def build_schematic() -> None:
         hidden_label("GND", 179.07, 106.68), hidden_label("GND", 149.86, 119.38),
         hidden_label("GND", 190.50, 97.79), hidden_label("+13V8", 208.28, 90.17),
         hidden_label("GND", 208.28, 119.38), hidden_label("+13V8", 224.79, 90.17),
-        hidden_label("GND", 224.79, 110.49), hidden_label("+13V8", 242.57, 92.71),
+        hidden_label("GND", 224.79, 110.49), hidden_label("SW_NODE", 242.57, 92.71),
         hidden_label("CPUMP_MID", 247.65, 110.49), hidden_label("GND", 247.65, 118.11),
         hidden_label("-13V8", 264.16, 104.14), hidden_label("-13V8", 278.13, 110.49),
         hidden_label("GND", 278.13, 118.11), hidden_label("GND", 274.32, 156.21),
@@ -1981,6 +1985,7 @@ def build_pcb(with_artwork: bool = True) -> None:
     net_names = {match.group(2): match.group(1) for match in re.finditer(r'\(net\s+(\d+)\s+"([^"]*)"\)', source)}
     explicit = {
         "D4": {"1": ("+13V8", "K"), "2": ("SW_NODE", "A")}, "D6": {"1": ("GND", "K"), "2": ("CPUMP_MID", "A")}, "D7": {"1": ("-13V8", "K"), "2": ("CPUMP_MID", "A")}, "D5": {"1": ("GND", "K"), "2": ("PWR_LED_P", "A")}, "D8": {"1": ("-13V8", "K"), "2": ("NEG_LED_N", "A")},
+        "C9": {"1": ("SW_NODE", "+"), "2": ("CPUMP_MID", "-")},
     }
 
     def nets_for(ref: str) -> dict[str, dict[str, str]]:
@@ -2011,7 +2016,7 @@ def build_pcb(with_artwork: bool = True) -> None:
         "R10": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "1k 0.1%", (64, -54), 90),
         "R11": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "10k 0.1%", (88, -89), 90),
         "R16": (KI_FOOTPRINTS / "Resistor_THT.pretty/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.kicad_mod", "Resistor_THT", "10k 0.1%", (78, -56), 90),
-        "L1": (KI_FOOTPRINTS / "Inductor_SMD.pretty/L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering.kicad_mod", "Inductor_SMD", "100uH", (89, 15), 0), "D4": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (106, 22), 180), "D6": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (102, 50), 90), "D7": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (115, 35), 180), "D5": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "GREEN LED", (116, 29), 90), "D8": (KI_FOOTPRINTS / "LED_SMD.pretty/LED_0805_2012Metric.kicad_mod", "LED_SMD", "RED LED", (106, 61), 90),
+        "L1": (KI_FOOTPRINTS / "Inductor_SMD.pretty/L_Taiyo-Yuden_NR-10050_9.8x10.0mm_HandSoldering.kicad_mod", "Inductor_SMD", "100uH", (89, 15), 0), "D4": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (106, 22), 180), "D6": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (102, 50), 90), "D7": (KI_FOOTPRINTS / "Diode_THT.pretty/D_DO-41_SOD81_P10.16mm_Horizontal.kicad_mod", "Diode_THT", "1N5819", (115, 35), 180), "D5": (KI_FOOTPRINTS / "LED_THT.pretty/LED_D3.0mm.kicad_mod", "LED_THT", "GREEN LED 3mm", (116, 29), 90), "D8": (KI_FOOTPRINTS / "LED_THT.pretty/LED_D3.0mm.kicad_mod", "LED_THT", "RED LED 3mm", (106, 61), 90),
         "C6": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D8.0mm_P3.50mm.kicad_mod", "Capacitor_THT", "220uF 35V", (78, 25), 0), "C8": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "47uF 35V", (110, 23), 0), "C9": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V", (101, 29), 0), "C11": (KI_FOOTPRINTS / "Capacitor_THT.pretty/CP_Radial_D5.0mm_P2.00mm.kicad_mod", "Capacitor_THT", "10uF 50V (+ to GND)", (115, 43), 0), "C7": (KI_FOOTPRINTS / "Capacitor_THT.pretty/C_Disc_D5.0mm_W2.5mm_P2.50mm.kicad_mod", "Capacitor_THT", "470pF 50V C0G", (82, 32), 0),
     }
     for index, ref in enumerate(["TP1", "TP2", "TP3", "TP4"]):

@@ -2507,13 +2507,13 @@
 		(exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
 		(uuid "40000000-0000-4000-8000-000000000012")
 		(property "Reference" "D5" (at 169.04 42.04 270) (effects (font (size 1.27 1.27))))
-		(property "Value" "GREEN LED" (at 173.99 47.04 270) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_0805_2012Metric" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))		(property "Manufacturer" "OptoSupply" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "MPN" "OSG50805C1C" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "AkizukiCode" "106423" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "Value" "GREEN LED 3mm" (at 173.99 47.04 270) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "LED_THT:LED_D3.0mm" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))		(property "Manufacturer" "OptoSupply" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "MPN" "OSG5TA3Z74A" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "AkizukiCode" "111635" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
 		(property "Supplier" "Akizuki Denshi" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "SourceURL" "https://akizukidenshi.com/catalog/g/g106423/" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "SelectionNote" "green LED; 2012/0805 SMD; hand-solderable" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "SourceURL" "https://akizukidenshi.com/catalog/g/g111635/" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "SelectionNote" "green 3mm bullet LED; radial through-hole; 2.54mm pitch" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
 
 		(pin "1" (uuid "42000000-0000-4000-8000-000000000021"))
 		(pin "2" (uuid "42000000-0000-4000-8000-000000000022"))
@@ -2592,13 +2592,13 @@
 		(exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
 		(uuid "40000000-0000-4000-8000-000000000017")
 		(property "Reference" "D8" (at 231.04 50.8 90) (effects (font (size 1.27 1.27))))
-		(property "Value" "RED LED" (at 231.04 55.88 90) (effects (font (size 1.27 1.27))))
-		(property "Footprint" "LED_SMD:LED_0805_2012Metric" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))		(property "Manufacturer" "OptoSupply" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "MPN" "OSR50805C1C" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "AkizukiCode" "106419" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "Value" "RED LED 3mm" (at 231.04 55.88 90) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "LED_THT:LED_D3.0mm" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))		(property "Manufacturer" "OptoSupply" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "MPN" "OSR5JA3Z74A" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "AkizukiCode" "111577" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
 		(property "Supplier" "Akizuki Denshi" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "SourceURL" "https://akizukidenshi.com/catalog/g/g106419/" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
-		(property "SelectionNote" "red LED; 2012/0805 SMD; hand-solderable" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "SourceURL" "https://akizukidenshi.com/catalog/g/g111577/" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
+		(property "SelectionNote" "red 3mm bullet LED; radial through-hole; 2.54mm pitch" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
 
 		(pin "1" (uuid "42000000-0000-4000-8000-000000000031"))
 		(pin "2" (uuid "42000000-0000-4000-8000-000000000032"))
@@ -4090,7 +4090,7 @@
 
 	(wire
 		(pts
-			(xy 123.19 21.59) (xy 181.61 21.59)
+				(xy 123.19 21.59) (xy 163.83 21.59)
 		)
 		(stroke (width 0) (type solid))
 		(uuid "183b8a60-82db-4679-9a8a-9fc2fb97c344")
@@ -4146,10 +4146,26 @@
 
 	(wire
 		(pts
-			(xy 181.61 31.75) (xy 181.61 21.59)
+				(xy 111.76 21.59) (xy 111.76 15.24)
 		)
 		(stroke (width 0) (type solid))
 		(uuid "ca889e63-23a4-424f-8441-e353cc574224")
+	)
+
+	(wire
+		(pts
+				(xy 111.76 15.24) (xy 181.61 15.24)
+		)
+		(stroke (width 0) (type solid))
+		(uuid "f119ff30-34fd-4a41-8a1e-375243962601")
+	)
+
+	(wire
+		(pts
+				(xy 181.61 15.24) (xy 181.61 31.75)
+		)
+		(stroke (width 0) (type solid))
+		(uuid "f119ff30-34fd-4a41-8a1e-375243962602")
 	)
 
 	(wire
@@ -4293,6 +4309,13 @@
 		(diameter 1.016)
 		(color 0 0 0 0)
 		(uuid "4bb1d8a0-48c7-4df2-9676-613b36c8ba74")
+	)
+
+	(junction
+		(at 111.76 21.59)
+		(diameter 1.016)
+		(color 0 0 0 0)
+		(uuid "f119ff30-34fd-4a41-8a1e-375243962603")
 	)
 
 	(junction
@@ -4547,7 +4570,7 @@
 		(uuid "a1ebfaa5-ccbb-4a81-a6c8-22295c0a0e56")
 	)
 
-	(label "+13V8"
+	(label "SW_NODE"
 		(at 181.61 31.75 0)
 		(effects (font (size 0.01 0.01)) (hide yes))
 		(uuid "a27bd5c7-6c4c-4cf9-83e5-e475743baeb6")

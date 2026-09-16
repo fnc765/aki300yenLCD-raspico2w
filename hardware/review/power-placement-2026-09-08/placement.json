@@ -1,0 +1,189 @@
+{
+  "input_sha256": "eac7fd8783d889817df51b5e0f2c8e1667af60d7da5ed7457deef36ce9f5d592",
+  "footprints_moved": [
+    "C11",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "D4",
+    "D5",
+    "D6",
+    "D7",
+    "D8",
+    "J2",
+    "J3",
+    "L1",
+    "R10",
+    "R11",
+    "R16",
+    "R7",
+    "R8",
+    "R9",
+    "RV1",
+    "TP1",
+    "TP2",
+    "TP3",
+    "TP4",
+    "U3"
+  ],
+  "electrical_signature_unchanged": true,
+  "other_footprints_edges_keepouts_and_nets_verbatim": true,
+  "draft_annotations_moved_to_Dwgs_User": 8,
+  "before_pad_distances_mm": {
+    "switch_to_diode": 9.548,
+    "diode_to_output_cap": 4.123,
+    "output_cap_to_switch_ground": 25.585,
+    "inductor_to_switch": 11.584,
+    "sense_to_pin7": 15.345,
+    "input_cap_to_vin": 13.574,
+    "input_cap_to_ground": 5.038,
+    "timing_to_pin3": 10.178,
+    "feedback_upper_to_pin5": 3.97,
+    "feedback_lower_to_pin5": 27.1,
+    "charge_cap_to_clamp": 10.886,
+    "charge_cap_to_rectifier": 6.276
+  },
+  "after_pad_distances_mm": {
+    "switch_to_diode": 3.534,
+    "diode_to_output_cap": 5.385,
+    "output_cap_to_switch_ground": 9.952,
+    "inductor_to_switch": 9.862,
+    "sense_to_pin7": 5.876,
+    "input_cap_to_vin": 8.05,
+    "input_cap_to_ground": 9.496,
+    "timing_to_pin3": 4.371,
+    "feedback_upper_to_pin5": 7.924,
+    "feedback_lower_to_pin5": 4.464,
+    "charge_cap_to_clamp": 4.84,
+    "charge_cap_to_rectifier": 5.211
+  },
+  "placements_mm_degrees": {
+    "J2": [
+      38.25,
+      12.75,
+      90
+    ],
+    "J3": [
+      8.25,
+      31.25,
+      0
+    ],
+    "U3": [
+      25.25,
+      22.75,
+      0
+    ],
+    "L1": [
+      17.5,
+      11,
+      0
+    ],
+    "C6": [
+      35.75,
+      22.75,
+      180
+    ],
+    "R7": [
+      38.25,
+      16.25,
+      180
+    ],
+    "R8": [
+      20.25,
+      18,
+      0
+    ],
+    "D4": [
+      19.25,
+      31.25,
+      90
+    ],
+    "C8": [
+      14.25,
+      29.25,
+      90
+    ],
+    "C7": [
+      23,
+      27.75,
+      0
+    ],
+    "R9": [
+      39,
+      32.5,
+      180
+    ],
+    "R10": [
+      28.75,
+      29,
+      0
+    ],
+    "C9": [
+      45,
+      15,
+      0
+    ],
+    "D6": [
+      47,
+      30,
+      90
+    ],
+    "D7": [
+      60.5,
+      19,
+      180
+    ],
+    "C11": [
+      55,
+      29,
+      0
+    ],
+    "R11": [
+      5,
+      39,
+      0
+    ],
+    "D5": [
+      18.5,
+      39,
+      180
+    ],
+    "R16": [
+      43,
+      35,
+      0
+    ],
+    "D8": [
+      56,
+      35,
+      0
+    ],
+    "RV1": [
+      16,
+      48,
+      180
+    ],
+    "TP1": [
+      41,
+      23,
+      0
+    ],
+    "TP2": [
+      15,
+      35.5,
+      0
+    ],
+    "TP3": [
+      57,
+      39,
+      0
+    ],
+    "TP4": [
+      6,
+      42,
+      0
+    ]
+  },
+  "note": "Distances are straight-line pad distances, not routed lengths or measured EMI."
+}
