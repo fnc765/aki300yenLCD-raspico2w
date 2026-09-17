@@ -14,15 +14,17 @@ final board has zero unconnected items.
   track or via.
 - +5V and +3V3 trunks use 0.60 mm tracks.  Their short connector/header necks
   use 0.20-0.30 mm where the 0.5 mm pitch or Pico pad spacing requires it.
-- +13V8 and -13V8 use 0.30 mm connector necks and 0.60 mm trunks back to the
-  completed power stage.  VCPP_ADJ uses 0.20-0.25 mm because it is a
-  low-current adjustment node.
-- U1 ground pads and every J1 ground pad are connected to the B.Cu LOGIC_GND
-  zone.  A short explicit F.Cu bridge prevents the ground plane from being
-  split by the ordered signal channels.
+- +13V8 and -13V8 use 0.30 mm connector necks, 0.60 mm constrained back-layer
+  necks below J1, and 1.00 mm main trunks back to the completed power stage.
+  VCPP_ADJ uses 0.20-0.25 mm because it is a low-current adjustment node.
+- U1 ground pads and every J1 ground pad are connected to matching F.Cu/B.Cu
+  LOGIC_GND zones.  Pads use thermal reliefs while GND vias connect directly.
+  A short explicit F.Cu bridge prevents the ground plane from being split by
+  the ordered signal channels.
 
-The deterministic generator is `route_pico_lcd.py`.  Its final report records
-127 route groups and 95 added vias.
+The deterministic generator is `route_pico_lcd.py`.  The later
+[ground and power refinement](ground-power-refinement.md) records the paired
+power vias, two-layer GND pours, and final DRC evidence.
 
 ## Verification
 

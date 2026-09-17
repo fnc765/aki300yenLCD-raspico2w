@@ -79,6 +79,8 @@ routes = [
      [[14.5, 26.5], [14.5, 27.385], [18.0, 27.385]]),
     ('input-regulator-vcc-neck', '+5V', 'F.Cu', 0.6,
      [[18.0, 27.385], pad('U3', '6')]),
+    ('input-regulator-vcc-via-pair-front', '+5V', 'F.Cu', 0.6,
+     [[18.0, 27.385], [17.2, 27.385]]),
     ('driver-bias', '+5V', 'B.Cu', 0.3,
      [pad('R7', '1'), [25.8, 22.75], [25.8, 30.8], pad('R8', '1')]),
     ('input-test-point-back', '+5V', 'B.Cu', 0.6,
@@ -87,9 +89,9 @@ routes = [
      [[9.5, 47.0], pad('TP1', '1')]),
 
     # Positive output distribution, away from the switch node on the back.
-    ('positive-output-terminal', '+13V8', 'B.Cu', 0.6,
+    ('positive-output-terminal', '+13V8', 'B.Cu', 1.0,
      [pad('C8', '1'), [5.3, 18.5], [5.3, 38.75], pad('J3', '1')]),
-    ('positive-output-test', '+13V8', 'F.Cu', 0.6,
+    ('positive-output-test', '+13V8', 'F.Cu', 1.0,
      [pad('J3', '1'), [4.5, 43.5], [12.75, 43.5], pad('TP2', '1')]),
     ('positive-output-sense-front', '+13V8', 'F.Cu', 0.3,
      [pad('D4', '1'), [7.0, 16.0], [7.0, 11.0], [18.0, 11.0], [18.0, 20.5]]),
@@ -119,12 +121,12 @@ routes = [
      [pad('C9', '2'), pad('D6', '2')]),
     ('charge-pump-rectifier', 'CPUMP_MID', 'F.Cu', 0.6,
      [pad('C9', '2'), [11.0, 37.5], [14.5, 35.5], pad('D7', '2')]),
-    ('negative-output-capacitor', '-13V8', 'B.Cu', 0.6,
+    ('negative-output-capacitor', '-13V8', 'B.Cu', 1.0,
      [pad('D7', '1'), [15.75, 29.0], pad('C11', '2')]),
     ('negative-indicator-feed', '-13V8', 'F.Cu', 0.2,
      [pad('C11', '2'), [24.8, 29.0], [26.3, 27.5], [26.3, 11.3],
       [24.4, 11.3], [23.0, 10.5], pad('D8', '1')]),
-    ('negative-test-point', '-13V8', 'F.Cu', 0.6,
+    ('negative-test-point', '-13V8', 'F.Cu', 1.0,
      [pad('C11', '2'), [23.5, 29.0], [23.5, 43.0], [16.0, 46.0], pad('TP3', '1')]),
     ('negative-led', 'NEG_LED_N', 'F.Cu', 0.3,
      [pad('D8', '2'), pad('R16', '1')]),
@@ -139,6 +141,7 @@ routes = [
 
 vias = [
     ('regulator-vcc-via', '+5V', [18.0, 27.385]),
+    ('regulator-vcc-via-pair', '+5V', [17.2, 27.385]),
     ('driver-via', 'DRIVER_DC', [17.5, 24.845]),
     ('positive-sense-via-a', '+13V8', [18.0, 20.5]),
     ('positive-sense-via-b', '+13V8', [23.0, 24.5]),
@@ -147,6 +150,7 @@ vias = [
     ('ground-test-via', 'GND', [19.25, 47.0]),
     ('power-ground-via', 'GND', pad('U3', '2')),
     ('quiet-ground-via', 'GND', pad('U3', '4')),
+    ('c11-ground-stitch', 'GND', [19.8, 27.0]),
 ]
 
 for _, net_name, layer_name, width_mm, points in routes:
@@ -156,19 +160,34 @@ for _, net_name, layer_name, width_mm, points in routes:
 for _, net_name, position in vias:
     add_via(net_name, position)
 
-# Local B.Cu ground plane: it ends before J1 and therefore does not enter the Pico/LCD area.
-zone = pcbnew.ZONE(board)
-zone.SetLayer(pcbnew.B_Cu)
-zone.SetNetCode(board.GetNetsByName()['GND'].GetNetCode())
-zone.SetZoneName('POWER_STAGE_GND')
-zone.SetLocalClearance(pcbnew.FromMM(0.3))
-zone.SetMinThickness(pcbnew.FromMM(0.25))
-zone.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
-outline = zone.Outline()
-outline.NewOutline()
-for xy in ([0.6, 0.6], [24.9, 0.6], [24.9, 51.4], [0.6, 51.4]):
-    outline.Append(point(xy))
-board.Add(zone)
+# Local two-layer ground plane: it ends before J1 and therefore does not enter
+# the Pico/LCD area.  Pads use thermal spokes; vias remain direct connections.
+power_ground_polygon = [[0.6, 0.6], [24.9, 0.6], [24.9, 51.4], [0.6, 51.4]]
+power_ground_zones = []
+for layer, name in (
+    (pcbnew.B_Cu, 'POWER_STAGE_GND'),
+    (pcbnew.F_Cu, 'POWER_STAGE_GND_F'),
+):
+    zone = pcbnew.ZONE(board)
+    zone.SetLayer(layer)
+    zone.SetNetCode(board.GetNetsByName()['GND'].GetNetCode())
+    zone.SetZoneName(name)
+    zone.SetLocalClearance(pcbnew.FromMM(0.3))
+    zone.SetMinThickness(pcbnew.FromMM(0.25))
+    zone.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL)
+    zone.SetThermalReliefGap(pcbnew.FromMM(0.3))
+    zone.SetThermalReliefSpokeWidth(pcbnew.FromMM(0.3))
+    zone.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    outline = zone.Outline()
+    outline.NewOutline()
+    for xy in power_ground_polygon:
+        outline.Append(point(xy))
+    board.Add(zone)
+    power_ground_zones.append({
+        'name': name,
+        'layer': board.GetLayerName(layer),
+        'polygon_mm': power_ground_polygon,
+    })
 
 pcbnew.ZONE_FILLER(board).Fill(board.Zones())
 args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -179,11 +198,7 @@ report = {
     'output': OUTPUT,
     'input_sha256': hashlib.sha256(args.input.read_bytes()).hexdigest(),
     'scope': 'power-stage-only',
-    'ground_zone': {
-        'name': 'POWER_STAGE_GND',
-        'layer': 'B.Cu',
-        'polygon_mm': [[0.6, 0.6], [24.9, 0.6], [24.9, 51.4], [0.6, 51.4]],
-    },
+    'ground_zones': power_ground_zones,
     'routes': [
         {'name': name, 'net': net, 'layer': layer, 'width_mm': width, 'points_mm': points}
         for name, net, layer, width, points in routes

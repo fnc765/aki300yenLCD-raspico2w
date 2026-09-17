@@ -250,6 +250,11 @@ add_route("3v3-u1-entry", "+3V3", "F.Cu", 0.6,
 add_route("5v-j1-escape", "+5V", "F.Cu", 0.2,
           [pad("J1", 31), [31.5, 43.0], [25.5, 37.0]])
 add_via("5v-source-via", "+5V", [25.5, 37.0])
+add_via("5v-source-via-pair", "+5V", [26.3, 37.0])
+add_route("5v-source-via-pair-front", "+5V", "F.Cu", 0.6,
+          [[25.5, 37.0], [26.3, 37.0]])
+add_route("5v-source-via-pair-back", "+5V", "B.Cu", 0.6,
+          [[25.5, 37.0], [26.3, 37.0]])
 add_route("5v-power-stage-join", "+5V", "B.Cu", 0.6,
           [[25.5, 37.0], [26.8, 35.0], [26.8, 32.0], [25.8, 30.8]])
 add_route("5v-pico-channel", "+5V", "F.Cu", 0.6,
@@ -274,20 +279,34 @@ add_route("5v-u1-entry", "+5V", "F.Cu", 0.6,
 add_route("13v8-j1-neck", "+13V8", "F.Cu", 0.3,
           [pad("J1", 35), [29.5, 42.7]])
 add_via("13v8-j1-via", "+13V8", [29.5, 42.7])
-add_route("13v8-return-trunk", "+13V8", "B.Cu", 0.6,
-          [[29.5, 42.7], [29.5, 45.5], [22.5, 45.5],
+add_route("13v8-return-neck-back", "+13V8", "B.Cu", 0.6,
+          [[29.5, 42.7], [29.5, 45.5]])
+add_route("13v8-return-trunk", "+13V8", "B.Cu", 1.0,
+          [[29.5, 45.5], [22.5, 45.5],
            [22.5, 48.5], [13.0, 48.5], [13.0, 42.7]])
 add_via("13v8-stage-via", "+13V8", [13.0, 42.7])
-add_route("13v8-stage-join", "+13V8", "F.Cu", 0.6,
+add_via("13v8-stage-via-pair", "+13V8", [12.2, 42.7])
+add_route("13v8-stage-via-pair-back", "+13V8", "B.Cu", 1.0,
+          [[13.0, 42.7], [12.2, 42.7]])
+add_route("13v8-stage-via-pair-front", "+13V8", "F.Cu", 1.0,
+          [[13.0, 42.7], [12.2, 42.7]])
+add_route("13v8-stage-join", "+13V8", "F.Cu", 1.0,
           [[13.0, 42.7], [12.75, 43.5]])
 
 add_route("neg13v8-j1-neck", "-13V8", "F.Cu", 0.3,
           [pad("J1", 33), [30.5, 42.9]])
 add_via("neg13v8-j1-via", "-13V8", [30.5, 42.9])
-add_route("neg13v8-return-trunk", "-13V8", "B.Cu", 0.6,
-          [[30.5, 42.9], [30.5, 41.5], [23.5, 41.5]])
+add_route("neg13v8-return-neck-back", "-13V8", "B.Cu", 0.6,
+          [[30.5, 42.9], [30.5, 41.5]])
+add_route("neg13v8-return-trunk", "-13V8", "B.Cu", 1.0,
+          [[30.5, 41.5], [23.5, 41.5]])
 add_via("neg13v8-stage-via", "-13V8", [23.5, 41.5])
-add_route("neg13v8-stage-join", "-13V8", "F.Cu", 0.6,
+add_via("neg13v8-stage-via-pair", "-13V8", [22.7, 41.5])
+add_route("neg13v8-stage-via-pair-front", "-13V8", "F.Cu", 1.0,
+          [[23.5, 41.5], [22.7, 41.5]])
+add_route("neg13v8-stage-via-pair-back", "-13V8", "B.Cu", 1.0,
+          [[23.5, 41.5], [22.7, 41.5]])
+add_route("neg13v8-stage-join", "-13V8", "F.Cu", 1.0,
           [[23.5, 41.5], [23.5, 43.0]])
 
 # J1 ground pads escape away from the signal fanout into a logic-side B.Cu
@@ -344,18 +363,32 @@ for name, u1_pad, position in (
 add_route("gnd-logic-bridge", "GND", "F.Cu", 0.4,
           [[47.0, 19.4], [63.0, 19.4], pad("U1", 8)])
 
-logic_ground = pcbnew.ZONE(board)
-logic_ground.SetLayer(pcbnew.B_Cu)
-logic_ground.SetNetCode(board.GetNetsByName()["GND"].GetNetCode())
-logic_ground.SetZoneName("LOGIC_GND")
-logic_ground.SetLocalClearance(pcbnew.FromMM(0.3))
-logic_ground.SetMinThickness(pcbnew.FromMM(0.25))
-logic_ground.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
-outline = logic_ground.Outline()
-outline.NewOutline()
-for xy in ([24.5, 1.0], [99.0, 1.0], [99.0, 51.0], [24.5, 51.0]):
-    outline.Append(point(xy))
-board.Add(logic_ground)
+logic_ground_polygon = [[24.5, 1.0], [99.0, 1.0], [99.0, 51.0], [24.5, 51.0]]
+logic_ground_zones = []
+for layer, name in (
+    (pcbnew.B_Cu, "LOGIC_GND"),
+    (pcbnew.F_Cu, "LOGIC_GND_F"),
+):
+    logic_ground = pcbnew.ZONE(board)
+    logic_ground.SetLayer(layer)
+    logic_ground.SetNetCode(board.GetNetsByName()["GND"].GetNetCode())
+    logic_ground.SetZoneName(name)
+    logic_ground.SetLocalClearance(pcbnew.FromMM(0.3))
+    logic_ground.SetMinThickness(pcbnew.FromMM(0.25))
+    logic_ground.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL)
+    logic_ground.SetThermalReliefGap(pcbnew.FromMM(0.3))
+    logic_ground.SetThermalReliefSpokeWidth(pcbnew.FromMM(0.3))
+    logic_ground.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    outline = logic_ground.Outline()
+    outline.NewOutline()
+    for xy in logic_ground_polygon:
+        outline.Append(point(xy))
+    board.Add(logic_ground)
+    logic_ground_zones.append({
+        "name": name,
+        "layer": board.GetLayerName(layer),
+        "polygon_mm": logic_ground_polygon,
+    })
 
 pcbnew.ZONE_FILLER(board).Fill(board.Zones())
 args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -368,11 +401,7 @@ report = {
     "scope": "pico-lcd-routing",
     "routes": routes,
     "vias": vias,
-    "ground_zone": {
-        "name": "LOGIC_GND",
-        "layer": "B.Cu",
-        "polygon_mm": [[24.5, 1.0], [99.0, 1.0], [99.0, 51.0], [24.5, 51.0]],
-    },
+    "ground_zones": logic_ground_zones,
 }
 if args.report:
     args.report.parent.mkdir(parents=True, exist_ok=True)

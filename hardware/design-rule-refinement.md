@@ -42,8 +42,8 @@ minimums:
 - Minimum via geometry: 0.50/0.30 mm pad/drill.  The default remains
   0.60/0.30 mm; 0.50/0.30 mm is used for the fine-pitch connector fanout.
 - Hole-to-copper and hole-to-hole minima: 0.25 mm.
-- The LOGIC_GND pour is inset to 1.00 mm at the outer board edge.
-- The POWER_STAGE_GND pour remains 0.60 mm from the outer edge.  A tested
+- The F.Cu/B.Cu LOGIC_GND pours are inset to 1.00 mm at the outer board edge.
+- The F.Cu/B.Cu POWER_STAGE_GND pours remain 0.60 mm from the outer edge.  A tested
   1.00 mm inset separated the pour into two islands around the edge-mounted
   +13 V terminal, so continuous ground return takes precedence here.  The
   0.50 mm global fabrication rule still protects this intentional exception.
@@ -56,8 +56,8 @@ minimums:
   trunk and via meet the 1.00 mm routed-copper edge rule.
 - Shifted the +3V3 notch-side trunk, LCD_R4 bridge, and -13V8 indicator feed
   inward while preserving the established routing topology.
-- Kept the B.Cu ground reference continuous instead of creating a split return
-  plane solely to maximize zone-to-edge distance.
+- Kept both copper-layer ground references continuous instead of creating a
+  split return plane solely to maximize zone-to-edge distance.
 
 The deterministic migration is implemented by `refine_edge_routing.py`;
 the fresh-board generators `route_power_stage.py` and
@@ -81,3 +81,7 @@ render.
 These checks validate the design files and geometry only.  Fabrication,
 assembled-board power integrity, LCD timing margin, emissions, immunity, and
 thermal behavior remain unverified.
+
+The later [ground and power refinement](ground-power-refinement.md) changed both
+GND layers to thermal-relief pad connections, widened the bias-rail trunks, and
+added paired power vias without changing the 13 known non-routing DRC items.
