@@ -1,0 +1,61 @@
+{
+  "input": "C:\\Users\\choco\\Documents\\programming\\rust-ws\\raspberrypi+300yenLCD\\pico_lta042b010f_carrier.kicad_pcb",
+  "output": "C:\\Users\\choco\\AppData\\Local\\Temp\\codex-silk-36f34654fb964b0a9fcdceac1c4d7d79\\final.kicad_pcb",
+  "input_sha256": "d014062244d57455dc7440b39bc274cb832be80f1a03c1295bb006d2602f96b9",
+  "scope": "front-silkscreen-cleanup-and-board-identification",
+  "footprint_placement_changed": false,
+  "reference_moves": [
+    {
+      "reference": "H1",
+      "before_mm": [
+        4.0,
+        -0.2
+      ],
+      "after_mm": [
+        4.0,
+        8.0
+      ]
+    },
+    {
+      "reference": "H4",
+      "before_mm": [
+        96.0,
+        -0.2
+      ],
+      "after_mm": [
+        96.0,
+        8.0
+      ]
+    }
+  ],
+  "d6_k_marker": {
+    "before_mm": [
+      10.85,
+      41.25
+    ],
+    "after_mm": [
+      10.85,
+      39.0
+    ]
+  },
+  "identification": [
+    {
+      "text": "PICO2W-LTA042B010F",
+      "position_mm": [
+        37.5,
+        14.0
+      ],
+      "size_mm": 1.2,
+      "thickness_mm": 0.18
+    },
+    {
+      "text": "REV A  2026-09-17",
+      "position_mm": [
+        37.5,
+        16.0
+      ],
+      "size_mm": 1.0,
+      "thickness_mm": 0.15
+    }
+  ]
+}

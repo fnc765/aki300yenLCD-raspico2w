@@ -104,7 +104,7 @@
 		(descr "Mounting Hole 3.2mm, no annular, M3")
 		(tags "mounting hole 3.2mm no annular m3")
 		(property "Reference" "H1"
-			(at 0 -4.2 0)
+			(at 0 4 0)
 			(layer "F.SilkS")
 			(uuid "2419a964-d243-5fd4-81b5-5012a0237f29")
 			(effects
@@ -201,7 +201,7 @@
 		(descr "Mounting Hole 3.2mm, no annular, M3")
 		(tags "mounting hole 3.2mm no annular m3")
 		(property "Reference" "H4"
-			(at 0 -4.2 0)
+			(at 0 4 0)
 			(layer "F.SilkS")
 			(uuid "774a4446-622b-5f5c-ba64-8e8ab6deca56")
 			(effects
@@ -10689,7 +10689,7 @@
 			(uuid "3300b016-7308-5474-9808-34b25aa3b34f")
 		)
 		(fp_text user "K"
-			(at -2.1 0 90)
+			(at -2.1 2.25 90)
 			(layer "F.SilkS")
 			(uuid "d527db19-4536-5708-9ce7-283a6d140382")
 			(effects
@@ -13867,6 +13867,28 @@
 		)
 		(layer "Edge.Cuts")
 		(uuid "b6c63b8a-b66b-40d5-a873-8df9d831716a")
+	)
+	(gr_text "REV A  2026-09-17"
+		(at 37.5 16 0)
+		(layer "F.SilkS")
+		(uuid "ab358511-d051-4286-82d7-a7ce393ce22c")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(gr_text "PICO2W-LTA042B010F"
+		(at 37.5 14 0)
+		(layer "F.SilkS")
+		(uuid "edd50913-d9dd-4060-9565-9cb01e7aec41")
+		(effects
+			(font
+				(size 1.2 1.2)
+				(thickness 0.18)
+			)
+		)
 	)
 	(gr_text "NO COPPER ROUTING YET"
 		(at 50 13 0)
