@@ -93,15 +93,15 @@ routes = [
      [pad('C8', '1'), [5.3, 18.5], [5.3, 38.75], pad('J3', '1')]),
     ('positive-output-test', '+13V8', 'F.Cu', 1.0,
      [pad('J3', '1'), [4.5, 43.5], [12.75, 43.5], pad('TP2', '1')]),
-    ('positive-output-sense-front', '+13V8', 'F.Cu', 0.3,
+    ('positive-output-sense-front', '+13V8', 'F.Cu', 1.0,
      [pad('D4', '1'), [7.0, 16.0], [7.0, 11.0], [18.0, 11.0], [18.0, 20.5]]),
-    ('positive-output-sense-back-a', '+13V8', 'B.Cu', 0.3,
+    ('positive-output-sense-back-a', '+13V8', 'B.Cu', 1.0,
      [[18.0, 20.5], [22.5, 20.5], [22.5, 24.5], [23.0, 24.5]]),
-    ('positive-output-sense-bridge', '+13V8', 'F.Cu', 0.3,
+    ('positive-output-sense-bridge', '+13V8', 'F.Cu', 1.0,
      [[23.0, 24.5], [23.0, 27.0]]),
-    ('positive-output-sense-back-b', '+13V8', 'B.Cu', 0.3,
+    ('positive-output-sense-back-b', '+13V8', 'B.Cu', 1.0,
      [[23.0, 27.0], [23.0, 32.5], pad('R9', '1')]),
-    ('positive-indicator-feed', '+13V8', 'F.Cu', 0.3,
+    ('positive-indicator-feed', '+13V8', 'F.Cu', 1.0,
      [pad('C8', '1'), pad('R11', '1')]),
 
     # Quiet control traces remain on the front and avoid the power loops.
@@ -123,9 +123,9 @@ routes = [
      [pad('C9', '2'), [11.0, 37.5], [14.5, 35.5], pad('D7', '2')]),
     ('negative-output-capacitor', '-13V8', 'B.Cu', 1.0,
      [pad('D7', '1'), [15.75, 29.0], pad('C11', '2')]),
-    ('negative-indicator-feed', '-13V8', 'F.Cu', 0.2,
-     [pad('C11', '2'), [24.8, 29.0], [26.3, 27.5], [26.3, 11.3],
-      [24.4, 11.3], [23.0, 10.5], pad('D8', '1')]),
+    ('negative-indicator-feed', '-13V8', 'F.Cu', 1.0,
+     [pad('C11', '2'), [24.8, 29.0], [26.45, 27.35], [26.45, 11.6],
+      [23.4, 11.6], [23.4, 10.8], pad('D8', '1')]),
     ('negative-test-point', '-13V8', 'F.Cu', 1.0,
      [pad('C11', '2'), [23.5, 29.0], [23.5, 43.0], [16.0, 46.0], pad('TP3', '1')]),
     ('negative-led', 'NEG_LED_N', 'F.Cu', 0.3,
@@ -159,6 +159,10 @@ for _, net_name, layer_name, width_mm, points in routes:
 
 for _, net_name, position in vias:
     add_via(net_name, position)
+
+# Rotate C11's thermal spokes so the widened +13 V sense route still leaves
+# two B.Cu spokes, while retaining the 0.30 mm thermal gap and spoke width.
+footprints['C11'].FindPadByNumber('1').SetThermalSpokeAngleDegrees(45.0)
 
 # Local two-layer ground plane: it ends before J1 and therefore does not enter
 # the Pico/LCD area.  Pads use thermal spokes; vias remain direct connections.

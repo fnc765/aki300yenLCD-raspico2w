@@ -6,10 +6,11 @@
 
 - GNDゾーンは電源部とロジック部の両方にF.Cu/B.Cuを設け、合計4ゾーンとした。
 - 全ゾーンのパッド接続をサーマルリリーフに統一した。サーマルギャップとスポーク幅はともに0.30 mm。GNDビアは電流・高周波帰路のインピーダンスを増やさないダイレクト接続のままとした。
-- +13V8/-13V8の空間に余裕がある主幹、出力端子、出力コンデンサ、テスト端子への経路を0.60 mmから1.00 mmへ拡幅した。
-- J1直下は+13V8と-13V8の中心間隔が小さく、両方を1.00 mmにするとDRC短絡になるため、F.Cuの0.30 mmヘッダネックとB.Cuの0.60 mm制約ネックを残した。主幹へ出た後は1.00 mm。
+- +13V8/-13V8は、主幹だけでなく帰還・表示LED分岐も含め、物理的に可能な全配線を1.00 mmへ拡幅した。
+- J1の0.5 mmピッチ部は隣接GNDパッドとの間に1.00 mmを通せないため、パッドからのF.Cu逃げ3区間だけを0.30 mmとした。+13V8ビアを(29.3, 42.5) mmへ移し、B.Cuで両電源を直ちに反対方向へ分岐させることで、従来の0.60 mmネックは廃止した。
+- -13V8のLED分岐はR7、VCPP_ADJビア、上辺の段差形状を避けて引き直し、全区間を1.00 mmとした。
 - 0.60/0.30 mm（パッド径/ドリル径）の電源ビアを、空間のある主要層切替点で2本並列にした。J1直下は1本でも概算電流容量を満たし、並列化するとパッドや隣接電源へ干渉するため単独のままとした。
-- C11周辺でB.CuのGND島が生じないよう、(19.8, 27.0) mmにGNDスティッチビアを追加してF.Cu/B.Cuを直結した。
+- C11周辺でB.CuのGND島が生じないよう、(19.8, 27.0) mmにGNDスティッチビアを追加してF.Cu/B.Cuを直結した。配線拡幅後も2本のサーマルスポークを確保するため、C11のGNDパッドだけスポーク角度を45度とした。ギャップとスポーク幅は0.30 mmのまま。
 
 ## 根拠
 
@@ -23,15 +24,15 @@
 - +5V並列ビア: (18.0, 27.385)/(17.2, 27.385) mm、(25.5, 37.0)/(26.3, 37.0) mm。
 - +13V8並列ビア: (13.0, 42.7)/(12.2, 42.7) mm。
 - -13V8並列ビア: (23.5, 41.5)/(22.7, 41.5) mm。
-- +13V8/-13V8主幹は1.00 mm。低電流の帰還、LED分岐、J1直下の制約ネックは用途とクリアランスに応じて0.20～0.60 mmを維持した。
-- 再現用スクリプトは`route_power_stage.py`、`route_pico_lcd.py`、既配線基板の移行は`upgrade_ground_power.py`。
+- +13V8は1.00 mmが27区間、-13V8は1.00 mmが19区間。1.00 mm未満はJ1パッド逃げの0.30 mm×3区間だけで、0.60 mm区間は残っていない。
+- 再現用スクリプトは`route_power_stage.py`、`route_pico_lcd.py`。既配線基板は`upgrade_ground_power.py`の後に`widen_13v_routes.py`を適用する。
 
 ## 検証
 
 - KiCad 9 ERC: 0件。
 - KiCad 9 DRC: 未配線0件。短絡、クリアランス、穴クリアランス、サーマル不足、銅箔端、ダングリング、ソルダーマスクブリッジはいずれも0件。
 - 残る13件は変更前と同じ非配線項目: ライブラリ不一致9件、シルク端2件、H3のkeepout 1件、シルク重なり1件。
-- [変更前DRC](review/ground-power-refinement-2026-09-17/before-drc.json)、[変更後DRC](review/ground-power-refinement-2026-09-17/after-drc.json)、[ERC](review/ground-power-refinement-2026-09-17/erc.json)、[移行レポート](review/ground-power-refinement-2026-09-17/migration-report.json)を保存した。
-- 銅箔確認用の[Top SVG](review/ground-power-refinement-2026-09-17/top-copper.svg)と[Bottom SVG](review/ground-power-refinement-2026-09-17/bottom-copper.svg)、[Top 3D](review/ground-power-refinement-2026-09-17/top-3d.png)と[Bottom 3D](review/ground-power-refinement-2026-09-17/bottom-3d.png)を出力した。
+- 今回の[変更前DRC](../review/13v-width-2026-09-17/before-drc.json)、[変更後DRC](../review/13v-width-2026-09-17/after-drc.json)、[ERC](../review/13v-width-2026-09-17/erc.json)、[移行レポート](../review/13v-width-2026-09-17/migration-report.json)を保存した。
+- 銅箔確認用の[Top SVG](../review/13v-width-2026-09-17/top-copper.svg)と[Bottom SVG](../review/13v-width-2026-09-17/bottom-copper.svg)を出力した。
 
 電流容量、温度上昇、電源リップル、EMIは実機未測定であり、製造前に通電評価を行う。
