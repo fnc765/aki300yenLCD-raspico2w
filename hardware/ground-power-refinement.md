@@ -24,8 +24,9 @@
 - +5V並列ビア: (18.0, 27.385)/(17.2, 27.385) mm、(25.5, 37.0)/(26.3, 37.0) mm。
 - +13V8並列ビア: (13.0, 42.7)/(12.2, 42.7) mm。
 - -13V8並列ビア: (23.5, 41.5)/(22.7, 41.5) mm。
-- +13V8は1.00 mmが27区間、-13V8は1.00 mmが19区間。1.00 mm未満はJ1パッド逃げの0.30 mm×3区間だけで、0.60 mm区間は残っていない。
-- 再現用スクリプトは`route_power_stage.py`、`route_pico_lcd.py`。既配線基板は`upgrade_ground_power.py`の後に`widen_13v_routes.py`を適用する。
+- +13V8は1.00 mmが24区間、-13V8は1.00 mmが17区間。1.00 mm未満はJ1パッド逃げの0.30 mm×3区間だけで、0.60 mm区間は残っていない。
+- J1付近のB.Cu帰路を直線的に引き直した。+13V8は27.046 mm（6区間）から16.585 mm（3区間）へ38.7%短縮し、-13V8は11.963 mm（4区間）から9.136 mm（2区間）へ23.6%短縮した。線幅1.00 mmと部品配置は変更していない。
+- 再生成には`route_power_stage.py`と`route_pico_lcd.py`を使う。未拡幅の既配線基板には`upgrade_ground_power.py`の後に`widen_13v_routes.py`を適用し、既に1.00 mm化済みの旧経路だけを更新する場合は`optimize_j1_bias_routes.py`を使う。
 
 ## 検証
 
@@ -34,5 +35,7 @@
 - 残る13件は変更前と同じ非配線項目: ライブラリ不一致9件、シルク端2件、H3のkeepout 1件、シルク重なり1件。
 - 今回の[変更前DRC](../review/13v-width-2026-09-17/before-drc.json)、[変更後DRC](../review/13v-width-2026-09-17/after-drc.json)、[ERC](../review/13v-width-2026-09-17/erc.json)、[移行レポート](../review/13v-width-2026-09-17/migration-report.json)を保存した。
 - 銅箔確認用の[Top SVG](../review/13v-width-2026-09-17/top-copper.svg)と[Bottom SVG](../review/13v-width-2026-09-17/bottom-copper.svg)を出力した。
+- J1帰路最適化の[変更前DRC](../review/j1-bias-route-optimization-2026-09-17/before-drc.json)、[変更後DRC](../review/j1-bias-route-optimization-2026-09-17/after-drc.json)、[ERC](../review/j1-bias-route-optimization-2026-09-17/erc.json)、[移行レポート](../review/j1-bias-route-optimization-2026-09-17/migration-report.json)を保存した。変更前後のDRC分類・件数は一致した。
+- 最適化後の銅箔確認用[Top SVG](../review/j1-bias-route-optimization-2026-09-17/top-copper.svg)と[Bottom SVG](../review/j1-bias-route-optimization-2026-09-17/bottom-copper.svg)を出力した。
 
 電流容量、温度上昇、電源リップル、EMIは実機未測定であり、製造前に通電評価を行う。
