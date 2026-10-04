@@ -1,0 +1,8 @@
+# Copy to probe.local.toml and fill locally. Do not share credentials or firmware.
+[wifi]
+ssid = ""
+password = ""
+
+[matter]
+# Generate an 11-digit code in Tapo's Matter Setup Code screen before pairing.
+setup_code = ""

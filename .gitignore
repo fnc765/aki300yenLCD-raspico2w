@@ -5,3 +5,7 @@
 
 # Codex-provided attachments are workspace metadata, not project sources.
 /.codex-remote-attachments/
+
+# Local Matter probe dependencies, device backups, and private configuration.
+/.local/
+/experiments/pico2w-matter-probe/probe.local.toml
