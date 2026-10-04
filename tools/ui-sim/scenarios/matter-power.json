@@ -1,0 +1,12 @@
+{
+  "layout": "glass",
+  "message": "P110M の消費電力を Pico 2 W が Matter 経由で取得しています。",
+  "power": {"milliwatts": 343336, "status": "fresh"},
+  "status": {
+    "expanded": false,
+    "ident_head": "ticker v0.6.1",
+    "version": "v0.6.1",
+    "ota": "OTA: up to date"
+  },
+  "animation": {"duration_ms": 2400, "frame_ms": 50}
+}

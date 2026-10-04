@@ -1,0 +1,5 @@
+{
+  "power": {"milliwatts": 343336, "status": "stale", "age_secs": 28},
+  "message": "電力の更新を待っています。old は最後に取得した古い値です。",
+  "status": {"version": "v0.6.1"}
+}

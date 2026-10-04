@@ -24,6 +24,8 @@
 //! └─────────────────────────────────────┘
 //! ```
 
+pub mod display;
 pub mod framebuffer;
 pub mod pio_program;
+pub mod scan;
 pub mod timing;

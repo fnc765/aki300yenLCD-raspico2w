@@ -1,0 +1,291 @@
+# Build every [[bin]] for the Pico 2 W (RP2350) and publish ELF + UF2 + raw
+# .bin (for OTA) plus the A/B partition table UF2 as an Actions artifact named
+# firmware-<sha>. Tags v* additionally get a GitHub Release with the UF2/.bin
+# files, the OTA image and manifest.json attached (docs/wifi-ota.md).
+#
+# The OTA-capable bins (ticker, wifi_ota) are built twice on every push:
+#   * plain (no TBYB flag) together with all other bins -> out/<bin>-plain.{uf2,bin,sha256}
+#     for a first install over USB when Wi-Fi is not set up yet.
+#   * --features tbyb -> out/<bin>.{uf2,bin,sha256}. out/manifest.json names ticker.bin (since
+#     v0.3.0; wifi_ota.bin up to v0.2.8): the running firmware downloads whatever "bin" the
+#     manifest names (bootrom starts it under the TBYB watchdog; the firmware calls explicit_buy
+#     after its self-test), so a board running wifi_ota 0.2.8 updates itself into ticker.
+# On v* tags the tag must equal Cargo.toml's version, otherwise the build fails.
+#
+# The build job is also a reusable workflow (workflow_call): release.yml calls it with
+# `ref` + `version` and then creates the tag and the Release itself, because a tag pushed
+# with GITHUB_TOKEN never triggers this workflow's push:tags path.
+name: build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      bin:
+        description: 'Build only this [[bin]] (empty = all bins)'
+        default: sd_bmp_viewer
+        required: false
+  workflow_call:
+    inputs:
+      bin:
+        description: 'Build only this [[bin]] (empty = all bins)'
+        type: string
+        default: ''
+      ref:
+        description: 'Branch, tag or commit to build (empty = the caller''s commit)'
+        type: string
+        default: ''
+      version:
+        description: 'If set, Cargo.toml version must equal this (X.Y.Z) or the build fails'
+        type: string
+        default: ''
+    outputs:
+      artifact:
+        description: 'Name of the uploaded Actions artifact (firmware-<sha>)'
+        value: ${{ jobs.build.outputs.artifact }}
+      sha:
+        description: 'Commit that was built'
+        value: ${{ jobs.build.outputs.sha }}
+      version:
+        description: 'Cargo.toml version of the built commit'
+        value: ${{ jobs.build.outputs.version }}
+
+permissions:
+  contents: read
+
+env:
+  TARGET: thumbv8m.main-none-eabihf
+  PICOTOOL_RELEASE: v2.3.1-0   # raspberrypi/pico-sdk-tools tag (prebuilt binaries)
+  PICOTOOL_SRC_TAG: '2.3.1'    # raspberrypi/picotool + pico-sdk tag (source fallback)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact: ${{ steps.meta.outputs.artifact }}
+      sha: ${{ steps.meta.outputs.sha }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # The OTA firmware checklist (.claude/skills/ota-firmware/SKILL.md, pointed to by CLAUDE.md) keeps the
+      # OTA-reachability guarantee in every future change; fail early if it is removed, loses its frontmatter
+      # (line 1 `---`, `name: ota-firmware`, closing `---`), or CLAUDE.md no longer points to it.
+      - name: Check that the OTA firmware skill is present and referenced from CLAUDE.md
+        run: python3 scripts/check-skill.py
+
+      # rust-toolchain.toml already pins stable + target + components;
+      # the action only pre-installs them so the first cargo call is quiet.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+          components: rust-src, llvm-tools
+
+      - uses: Swatinem/rust-cache@v2
+
+      # On v* tags the tag must equal Cargo.toml's version; when called from release.yml the
+      # `version` input must. Also records the built commit for the artifact name / outputs.
+      - name: Check that the version to release matches Cargo.toml
+        id: meta
+        env:
+          WANT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          cargo_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          want="$WANT_VERSION"
+          case "$GITHUB_REF" in refs/tags/v*) want="${GITHUB_REF_NAME#v}" ;; esac
+          echo "Cargo.toml version: $cargo_version, wanted: ${want:-(none)}"
+          if [ -n "$want" ] && [ "$want" != "$cargo_version" ]; then
+            echo "::error::version $want (tag or release input) does not match Cargo.toml version $cargo_version" >&2
+            exit 1
+          fi
+          sha="$(git rev-parse HEAD)"
+          {
+            echo "sha=$sha"
+            echo "version=$cargo_version"
+            echo "artifact=firmware-$sha"
+          } >> "$GITHUB_OUTPUT"
+
+      # Host-side tests of the pure firmware logic (tools/ticker-tests): calendar, ticker.txt, SNTP, fonts,
+      # the supervisor, and (0.4.2) the boot policy with the boot-sequence simulation that injects hangs /
+      # crashes at every stage and checks that a broken build is never bought and the board always reaches
+      # an OTA check (docs/ticker.md §8). A step of this job (not a separate job) so that both release paths
+      # (the v* tag `release` job below and release.yml, which only consume this job's artifact) are gated on
+      # it, on the same ref as the firmware that gets released. The stack check below gates the same way.
+      - name: Host tests (tools/ticker-tests, boot policy + boot-sequence simulation)
+        working-directory: tools/ticker-tests
+        run: cargo test --release -- --nocapture
+
+      - name: cargo build --release
+        env:
+          BIN: ${{ inputs.bin }}
+        run: |
+          if [ -n "$BIN" ]; then
+            cargo build --release --bin "$BIN"
+          else
+            cargo build --release
+          fi
+
+      - name: Install picotool (prebuilt Linux tarball from pico-sdk-tools)
+        id: picotool_prebuilt
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libusb-1.0-0 >/dev/null
+          gh release download "$PICOTOOL_RELEASE" -R raspberrypi/pico-sdk-tools \
+            -p 'picotool-*x86_64-lin.tar.gz' -O picotool.tgz
+          mkdir -p "$RUNNER_TEMP/pt"
+          tar -xzf picotool.tgz -C "$RUNNER_TEMP/pt"
+          bin="$(find "$RUNNER_TEMP/pt" -type f -name picotool -perm -u+x | head -n 1)"
+          test -n "$bin"
+          "$bin" version
+          dirname "$bin" >> "$GITHUB_PATH"
+
+      - name: Build picotool from source (fallback)
+        if: steps.picotool_prebuilt.outcome != 'success'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cmake build-essential pkg-config libusb-1.0-0-dev >/dev/null
+          git clone --depth 1 --branch "$PICOTOOL_SRC_TAG" https://github.com/raspberrypi/pico-sdk "$RUNNER_TEMP/pico-sdk"
+          git clone --depth 1 --branch "$PICOTOOL_SRC_TAG" https://github.com/raspberrypi/picotool "$RUNNER_TEMP/picotool"
+          cmake -S "$RUNNER_TEMP/picotool" -B "$RUNNER_TEMP/picotool/build" \
+            -DPICO_SDK_PATH="$RUNNER_TEMP/pico-sdk" -DCMAKE_BUILD_TYPE=Release
+          make -C "$RUNNER_TEMP/picotool/build" -j"$(nproc)"
+          "$RUNNER_TEMP/picotool/build/picotool" version
+          echo "$RUNNER_TEMP/picotool/build" >> "$GITHUB_PATH"
+
+      - name: Convert ELF -> UF2 / .bin (scripts/make-ota-image.sh) and collect
+        run: |
+          set -euo pipefail
+          picotool version
+          mkdir -p out
+          for elf in "target/$TARGET/release"/*; do
+            [ -f "$elf" ] && [ -x "$elf" ] || continue   # skip deps/, build/, *.d
+            name="$(basename "$elf")"
+            case "$name" in *.*) continue ;; esac        # only extension-less executables
+            cp "$elf" "out/$name.elf"
+            scripts/make-ota-image.sh "$elf" out
+          done
+          # The plain (non-TBYB) ticker / wifi_ota are kept as <bin>-plain.*; <bin>.* below is the TBYB build.
+          for b in ticker wifi_ota; do
+            if [ -f "out/$b.uf2" ]; then
+              for ext in elf uf2 bin; do mv "out/$b.$ext" "out/$b-plain.$ext"; done
+              (cd out && rm -f "$b.sha256" && sha256sum "$b-plain.bin" > "$b-plain.sha256")
+            fi
+          done
+          git rev-parse HEAD > out/commit.txt
+          ls -l out
+          test -n "$(ls out/*.uf2)"
+
+      # OTA images: ticker and wifi_ota with the TBYB flag in IMAGE_DEF. manifest.json
+      # (scripts/make-manifest.sh) names ticker.bin, which is what a running board downloads.
+      - name: Build ticker + wifi_ota (--features tbyb) and manifest.json
+        if: inputs.bin == '' || inputs.bin == 'ticker' || inputs.bin == 'wifi_ota'
+        env:
+          BIN: ${{ inputs.bin }}
+        run: |
+          set -euo pipefail
+          bins="ticker wifi_ota"
+          [ -n "$BIN" ] && bins="$BIN"
+          for b in $bins; do
+            cargo build --release --bin "$b" --features tbyb
+            cp "target/$TARGET/release/$b" "out/$b.elf"
+            scripts/make-ota-image.sh "target/$TARGET/release/$b" out
+            picotool info -a -t elf "out/$b.elf" | grep -E 'version|tbyb' || true
+          done
+          if [ -f out/ticker.bin ]; then
+            version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+            scripts/make-manifest.sh out/ticker.bin "$version" out/manifest.json
+          fi
+          ls -l out/ticker* out/wifi_ota* out/manifest.json || true
+
+      # Worst-case stack depth of the OTA image (docs/ticker.md §7.1). 0.4.0 overflowed its stack in the
+      # first TLS handshake and froze; this fails the build if the deepest task path no longer fits.
+      - name: Stack depth check (ticker, scripts/stack-report.py)
+        if: inputs.bin == '' || inputs.bin == 'ticker'
+        run: python3 scripts/stack-report.py out/ticker.elf --path 6
+
+      # A/B partition table (docs/ota-setup.md): installed once via BOOTSEL.
+      - name: Create A/B partition table UF2
+        run: |
+          set -euo pipefail
+          scripts/make-partition-table.sh out/pico2w-ab.uf2
+          picotool info -t uf2 out/pico2w-ab.uf2
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Host-side UI simulator (tools/ui-sim, docs/ui-sim.md): unit tests + preview PNG/GIF of the
+  # ticker screen rendered by the same src/ui code as the firmware. Informational only: it never
+  # blocks the firmware build or a release (skipped when release.yml calls this workflow).
+  ui-preview:
+    if: inputs.version == ''
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/ui-sim
+      - name: cargo test + render previews
+        working-directory: tools/ui-sim
+        run: |
+          set -euo pipefail
+          cargo test --release
+          for s in scenarios/*.json; do
+            cargo run --release -- --scenario "$s" --out out/
+          done
+          cargo run --release -- sheet --out out/ --bg samples/SUNSET.BMP --bg samples/CLOUDS.BMP --bg samples/BOKEH.BMP
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-preview-${{ github.sha }}
+          path: tools/ui-sim/out/
+          retention-days: 14
+
+  # Only for tags pushed by hand. A tag pushed by release.yml (GITHUB_TOKEN) does not start
+  # this workflow at all, and release.yml attaches the assets itself.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: out
+
+      - name: Create GitHub Release with UF2s, OTA .bin files and manifest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::notice::Release $GITHUB_REF_NAME already exists (created by release.yml?); nothing to do"
+            exit 0
+          fi
+          ls -l out
+          test -f out/manifest.json
+          test -f out/ticker.bin
+          # The firmware running on the board fetches releases/latest/download/manifest.json and
+          # then the "bin" named in it (ticker.bin), so both must be attached to the same Release.
+          gh release create "$GITHUB_REF_NAME" out/*.uf2 out/*.bin out/*.sha256 out/manifest.json \
+            --verify-tag --generate-notes

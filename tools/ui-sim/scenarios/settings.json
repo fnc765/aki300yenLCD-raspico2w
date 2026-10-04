@@ -1,0 +1,12 @@
+{
+  "layout": "glass",
+  "background": "../samples/SUNSET.BMP",
+  "clock": { "year": 2026, "month": 9, "day": 30, "hour": 21, "minute": 53, "second": 44 },
+  "place": "東京",
+  "weather": { "temperature": 19.1, "code": 2, "max": 21.9, "min": 18.6, "rain_pct": 40 },
+  "message": "こんにちは、おちょこさん。今日もいい一日を。",
+  "status": { "expanded": false, "version": "v0.5.1" },
+  "settings": { "url": "http://192.168.200.130/", "code": "482913" },
+  "scroll_to_settings": -35,
+  "animation": { "duration_ms": 1000 }
+}

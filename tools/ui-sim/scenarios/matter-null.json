@@ -1,0 +1,5 @@
+{
+  "power": {"milliwatts": null, "status": "unavailable"},
+  "message": "P110M が未計測を返したため、電力は -- W と表示します。",
+  "status": {"version": "v0.6.1"}
+}
