@@ -1,13 +1,15 @@
 [package]
 edition = "2024"
 name = "pico2w-300yen-lcd"
-version = "0.1.0"
+version = "0.6.1"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
 # Embassy core
 embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt"] }
-embassy-rp = { version = "0.9", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp235xa"] }
+# imagedef-none: IMAGE_DEF は embassy ではなく本クレートの image_def モジュールで定義する
+# (版数 VERSION 項目と TBYB フラグを載せるため)。binary-info: picotool info 用のメタデータ。
+embassy-rp = { version = "0.9", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp235xa", "imagedef-none", "binary-info"] }
 embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
 embassy-sync = { version = "0.7", features = ["defmt"] }
 embassy-futures = { version = "0.1" }
@@ -38,6 +40,50 @@ static_cell = "2"
 embedded-graphics = "0.8"
 embedded-hal = "1.0"
 embedded-sdmmc = { version = "0.10", default-features = false }
+
+# Wi-Fi (CYW43439, wifi_status で使用)
+# cyw43-pio 0.9 / cyw43 0.6 / embassy-net 0.8 が embassy-rp 0.9 と組み合わせられる世代
+cyw43 = { version = "0.6", features = ["defmt"] }
+cyw43-pio = { version = "0.9", features = ["defmt"] }
+embassy-net = { version = "0.8", features = ["defmt", "proto-ipv4", "proto-ipv6", "multicast", "dhcpv4", "tcp", "udp", "dns", "medium-ethernet"] }
+heapless = "0.8"
+
+# Operational Matter controller: the exact revision validated by the Pico probe.
+rs-matter = { git = "https://github.com/project-chip/rs-matter.git", rev = "fa143d961c5838c867c9a1d382180a698e76ec51", default-features = false, features = ["rustcrypto", "max-fabrics-1", "max-sessions-3", "max-exchanges-per-session-3", "max-acls-per-fabric-1"] }
+rand_chacha = { version = "0.10", default-features = false }
+rand_core = "0.10"
+log = "0.4"
+embassy-usb-logger = "0.6"
+
+# HTTPS / OTA (wifi_ota で使用)
+# rsa: GitHub のアセット配信ホスト (*.githubusercontent.com) は RSA 4096 の証明書なので、
+# RSA 署名方式を ClientHello に載せないと TLS 1.3 ハンドシェイクが成立しない。
+# embedded-tls の rsa は alloc を要求するため embedded-alloc でヒープを用意する。
+# defmt feature は付けない: embedded-tls 0.18.0 の rsa 経路に defmt::Format を実装しない型の
+# error! があり、embedded-tls/defmt を有効にするとコンパイルできない。
+reqwless = { version = "0.14", default-features = false, features = ["embedded-tls", "rsa"] }
+# Matter and embedded-tls share stable DER. The TLS certificate parser needs the
+# fixed-capacity SequenceOf/SetOf types, now behind the heapless feature.
+der = { version = "=0.8.2", default-features = false, features = ["heapless"] }
+embedded-alloc = { version = "0.7", default-features = false, features = ["llff"] }
+embedded-io-async = "0.7"
+embedded-nal-async = "0.9"
+# reqwless 0.14 が使う embedded-tls 0.18 と同じ sha2 0.10 を共有する
+sha2 = { version = "0.10", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde-json-core = { version = "0.6", default-features = false }
+
+[build-dependencies]
+# 設定ページ (web/settings/index.html) を build.rs で gzip にする (0.5.0〜)
+miniz_oxide = "0.8"
+
+[features]
+default = []
+# IMAGE_DEF に TBYB (Try Before You Buy) フラグを立てる。OTA で書き込む
+# イメージ用。FLASH_UPDATE 起動でのみ選ばれ、explicit_buy するまで確定しない。
+tbyb = []
+# テスト用: ota_selftest が explicit_buy を呼ばない (ウォッチドッグで旧イメージへ戻る)。
+skip-buy = []
 
 [profile.dev]
 debug = 2
@@ -91,3 +137,27 @@ path = "src/bin/layer7_single_buffer_dma.rs"
 [[bin]]
 name = "sd_bmp_viewer"
 path = "src/bin/sd_bmp_viewer.rs"
+
+[[bin]]
+name = "wifi_status"
+path = "src/bin/wifi_status.rs"
+
+[[bin]]
+name = "ota_selftest"
+path = "src/bin/ota_selftest.rs"
+
+# Wi-Fi OTA (第 2 段階): wifi_status + GitHub Release からの自己更新。Release 用は --features tbyb
+[[bin]]
+name = "wifi_ota"
+path = "src/bin/wifi_ota.rs"
+
+# 診断用: 9e9d7f1 の単一バッファ表示に SM1 テーブルの SRAM 配置だけを加えたもの
+[[bin]]
+name = "ota_selftest_min"
+path = "src/bin/ota_selftest_min.rs"
+
+# ネットワーク・ティッカー (v0.3.0〜): NTP 時計 + Open-Meteo 天気 + GitHub の message.txt を流す + OTA。
+# Release の OTA イメージ (manifest.json の bin) はこれ。Release 用は --features tbyb
+[[bin]]
+name = "ticker"
+path = "src/bin/ticker.rs"
