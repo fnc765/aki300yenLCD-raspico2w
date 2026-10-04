@@ -76,7 +76,7 @@ pub enum DebugCrash {
 
 /// 既定の流れる文字の URL (このリポジトリの `ticker/message.txt`)
 pub const DEFAULT_MESSAGE_URL: &str =
-    "https://raw.githubusercontent.com/Droplet-Collective/aki300yenLCD-raspico2w/main/ticker/message.txt";
+    "https://raw.githubusercontent.com/fnc765/aki300yenLCD-raspico2w/main/ticker/message.txt";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TickerConfig {

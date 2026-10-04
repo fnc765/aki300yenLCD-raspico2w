@@ -39,7 +39,7 @@ STATE = {
         "status": "auto",
         "scroll": 1,
         "show_settings": True,
-        "message_url": "https://raw.githubusercontent.com/Droplet-Collective/aki300yenLCD-raspico2w/main/ticker/message.txt",
+        "message_url": "https://raw.githubusercontent.com/fnc765/aki300yenLCD-raspico2w/main/ticker/message.txt",
         "local_message": False,
         "message": "",
         "images": "",

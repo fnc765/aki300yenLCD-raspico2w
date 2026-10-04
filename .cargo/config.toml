@@ -1,4 +1,6 @@
 [target.thumbv8m.main-none-eabihf]
+# stack-report.py がタスク名と型情報を読める形式を、ホストの既定値に依存させない。
+rustflags = ["-C", "symbol-mangling-version=v0"]
 runner = "C:\\Users\\choco\\Documents\\scriptPath\\picotool\\picotool.exe load -u -v -x -t elf"
 # runner = "elf2uf2-rs -s"
 # runner = "probe-rs run --chip RP235x --protocol swd"

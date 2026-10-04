@@ -44,9 +44,10 @@ def tool(name):
     # GNU binutils の objdump / nm (x86 用) は ARM の ELF を読めないので使わない。
     sysroot = subprocess.run(["rustc", "--print", "sysroot"], capture_output=True, text=True).stdout.strip()
     if sysroot:
+        filename = f"llvm-{name}{'.exe' if os.name == 'nt' else ''}"
         for root, _, files in os.walk(os.path.join(sysroot, "lib", "rustlib")):
-            if f"llvm-{name}" in files:
-                return os.path.join(root, f"llvm-{name}")
+            if filename in files:
+                return os.path.join(root, filename)
     path = shutil.which(f"llvm-{name}")
     if path:
         return path
@@ -147,7 +148,9 @@ def main():
 
     nm = subprocess.run([tool("nm"), args.elf], capture_output=True, text=True, check=True).stdout
     syms = {l.split()[-1]: int(l.split()[0], 16) for l in nm.splitlines() if len(l.split()) == 3}
-    free = syms.get("_stack_start", 0) - syms.get("__euninit", 0)
+    if "_stack_start" not in syms or "__euninit" not in syms:
+        sys.exit("stack boundary symbols not found; cannot check stack margin")
+    free = syms["_stack_start"] - syms["__euninit"]
 
     if args.top:
         for n, s in sorted(frame.items(), key=lambda x: -x[1])[: args.top]:
@@ -165,16 +168,21 @@ def main():
     overhead = executor + 256 + irq_worst + EXCEPTION_FRAME
     print(f"free stack (_stack_start - __euninit): {free} B ({free / 1024:.1f} KiB)")
     print(f"executor + cortex-m-rt + worst IRQ ({irq_worst} B) + exception frame: ~{overhead} B")
-    deepest = 0
+    roots = []
     for label, pat in ROOTS:
         for n in funcs:
             if re.search(pat, n):
-                total, path = worst(n)
-                deepest = max(deepest, total)
-                print(f"\n{label}: {total} B (+ overhead = {total + overhead} B, margin {free - total - overhead} B)")
-                for p in path[: args.path]:
-                    print(f"  {frame[p]:6d}  {p[:150]}")
+                roots.append((label, n))
                 break
+    if not roots:
+        sys.exit("executor task entry points not found; build with -C symbol-mangling-version=v0")
+    deepest = 0
+    for label, n in roots:
+        total, path = worst(n)
+        deepest = max(deepest, total)
+        print(f"\n{label}: {total} B (+ overhead = {total + overhead} B, margin {free - total - overhead} B)")
+        for p in path[: args.path]:
+            print(f"  {frame[p]:6d}  {p[:150]}")
     print(f"\nworst task path + overhead: {deepest + overhead} B, free {free} B, margin {free - deepest - overhead} B")
     return 0 if deepest + overhead < free else 1
 

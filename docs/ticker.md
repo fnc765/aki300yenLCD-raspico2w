@@ -178,7 +178,7 @@ lat=35.6812          # 緯度 (-90〜90)
 lon=139.7671         # 経度 (-180〜180)
 tz=+9                # UTC からの時差 (時間)。9 / -5.5 / +05:30 / 9:00 の形も可。±14 まで
 place=東京           # 天気の行の先頭に出す地名 (最大 32 バイト、東雲フォントにある文字)
-message_url=https://raw.githubusercontent.com/Droplet-Collective/aki300yenLCD-raspico2w/main/ticker/message.txt
+message_url=https://raw.githubusercontent.com/fnc765/aki300yenLCD-raspico2w/main/ticker/message.txt
 scroll=1             # 流れる文字の速さ (px / フレーム、1〜8。60 Hz なので 1 = 60 px/s)
 slide=30             # 写真の切り替え間隔 (秒、5〜3600。0 = 切り替えない)          v0.4.0〜
 images=IMAGE.BMP,IMAGE2.BMP   # 背景に使う BMP と順番 (省略時はルートの *.BMP 全部、名前順)

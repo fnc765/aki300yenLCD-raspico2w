@@ -18,7 +18,7 @@ use core::fmt::Write as _;
 use heapless::String;
 
 /// 更新元リポジトリ (`gh api repos/... --jq .full_name` の正規名)。SD カード等からは読まない。
-pub const REPO: &str = "Droplet-Collective/aki300yenLCD-raspico2w";
+pub const REPO: &str = "fnc765/aki300yenLCD-raspico2w";
 /// Release アセット名
 pub const MANIFEST_NAME: &str = "manifest.json";
 /// GitHub の署名付きリダイレクト先 URL (release-assets.githubusercontent.com は JWT 付きで 1 kB を超える)

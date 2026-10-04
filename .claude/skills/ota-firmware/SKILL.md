@@ -133,7 +133,7 @@ python3 scripts/stack-report.py target/thumbv8m.main-none-eabihf/release/ticker 
 2. PR → CI 緑 (build ジョブ内のホストテストとスタック検査が Release の関門)。
 3. rebase merge (`gh api -X PUT .../pulls/N/merge -f merge_method=rebase`)。
 4. `release.yml` を dispatch:
-   `gh api -X POST repos/Droplet-Collective/aki300yenLCD-raspico2w/actions/workflows/release.yml/dispatches -f ref=main -f 'inputs[version]=X.Y.Z'`
+   `gh api -X POST repos/fnc765/aki300yenLCD-raspico2w/actions/workflows/release.yml/dispatches -f ref=main -f 'inputs[version]=X.Y.Z'`
    (プロキシ経由のタグ push は 403。`gh pr create` / `gh release download` も GraphQL で 403 なので REST を使う)。
 5. Release の `manifest.json` を確認: `bin` が OTA の bin (`ticker.bin`)、`size` と `sha256` がアセットと一致。
    **稼働中の機体は manifest の `bin` をそのまま取りに行く** (名前を変えると全台がそれに切り替わる)。

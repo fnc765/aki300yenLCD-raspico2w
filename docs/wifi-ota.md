@@ -17,7 +17,7 @@ OTA 機能を足したもの。
 起動 → LCD 走査開始 → SD の WIFI.TXT → Wi-Fi join → DHCP
    ↓ (TBYB 起動なら、ここまで通ったら explicit_buy で確定)
    ↓ 5 秒後、以後 60 秒ごと (OTA_CHECK_INTERVAL)
-[1] GET https://github.com/Droplet-Collective/aki300yenLCD-raspico2w/releases/latest/download/manifest.json
+[1] GET https://github.com/fnc765/aki300yenLCD-raspico2w/releases/latest/download/manifest.json
       302 → github.com/.../releases/download/vX.Y.Z/manifest.json → 302 → *.githubusercontent.com/... を自前で追う
       404 = Release がまだ無い (正常、次回また確認)
 [2] {"version":"0.2.1","bin":"wifi_ota.bin","size":N,"sha256":"..."} を semver で比較。
