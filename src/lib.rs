@@ -5,5 +5,21 @@
 
 #![no_std]
 
+pub mod ab_boot;
+pub mod boot_policy;
+pub mod boot_trace;
+pub mod font;
+pub mod heap;
+pub mod image_def;
 pub mod lcd;
+pub mod noinline;
+pub mod ota;
+pub mod persist;
 pub mod pins;
+pub mod sdcard;
+pub mod supervisor;
+pub mod ticker;
+pub mod ui;
+pub mod usb_reset;
+pub mod web;
+pub mod wifi;
