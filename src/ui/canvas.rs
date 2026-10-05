@@ -87,13 +87,47 @@ const fn corner_coverage(r: usize, i: usize, j: usize) -> u8 {
 pub struct Canvas<'a> {
     px: &'a mut [Color],
     clip: Clip,
+    #[cfg(test)]
+    audit_layout: bool,
+    #[cfg(test)]
+    regions: heapless::Vec<DrawRegion, 48>,
+}
+
+/// Host-only geometry evidence. Clipping a pixel buffer does not prove that text fits.
+#[cfg(test)]
+#[derive(Debug)]
+pub struct DrawRegion {
+    pub label: heapless::String<80>,
+    pub bounds: Clip,
+    pub clip: Clip,
 }
 
 impl<'a> Canvas<'a> {
     /// `px` は 400×96 の行優先 (`[y * 400 + x]`)
     pub fn new(px: &'a mut [Color]) -> Self {
         assert!(px.len() >= WIDTH * HEIGHT);
-        Self { px, clip: Clip::FULL }
+        Self {
+            px, clip: Clip::FULL,
+            #[cfg(test)]
+            audit_layout: false,
+            #[cfg(test)]
+            regions: heapless::Vec::new(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn audit_layout(&mut self) { self.audit_layout = true; }
+
+    #[cfg(test)]
+    pub fn draw_regions(&self) -> &[DrawRegion] { &self.regions }
+
+    #[cfg(test)]
+    fn record_region(&mut self, text: &str, x: i32, y: i32, w: i32, h: i32) {
+        if !self.audit_layout || text.is_empty() { return; }
+        let mut label = heapless::String::new();
+        for ch in text.chars() { if label.push(ch).is_err() { break; } }
+        self.regions.push(DrawRegion { label, bounds: Clip::new(x, y, w, h), clip: self.clip })
+            .expect("layout audit capacity");
     }
 
     pub fn pixels(&self) -> &[Color] {
@@ -226,6 +260,8 @@ impl<'a> Canvas<'a> {
 
     /// 東雲 14 px (等倍) を上端 `y` に描き、次の x を返す
     pub fn jp(&mut self, text: &str, x: i32, y: i32, c: Color) -> i32 {
+        #[cfg(test)]
+        self.record_region(text, x, y, shinonome::text_width(text) as i32, shinonome::HEIGHT as i32);
         let clip_right = self.clip.x1;
         shinonome::draw_text(text, x, y, clip_right, |px, py| self.put(px, py, c))
     }
@@ -241,6 +277,8 @@ impl<'a> Canvas<'a> {
 
     /// `FONT_6X10` (embedded-graphics) を上端 `y` に描き、次の x を返す
     pub fn small(&mut self, text: &str, x: i32, y: i32, c: Color) -> i32 {
+        #[cfg(test)]
+        self.record_region(text, x, y, text.chars().count() as i32 * 6, 10);
         let style = MonoTextStyle::new(&FONT_6X10, Rgb565::from(RawU16::new(c)));
         let _ = Text::with_baseline(text, Point::new(x, y), style, Baseline::Top).draw(self);
         x + text.len() as i32 * FONT_6X10.character_size.width as i32
@@ -248,6 +286,8 @@ impl<'a> Canvas<'a> {
 
     /// `FONT_5X7` (embedded-graphics、状態の小さな表示用) を上端 `y` に描き、次の x を返す
     pub fn tiny(&mut self, text: &str, x: i32, y: i32, c: Color) -> i32 {
+        #[cfg(test)]
+        self.record_region(text, x, y, text.chars().count() as i32 * 5, 7);
         let style = MonoTextStyle::new(&FONT_5X7, Rgb565::from(RawU16::new(c)));
         let _ = Text::with_baseline(text, Point::new(x, y), style, Baseline::Top).draw(self);
         x + text.len() as i32 * FONT_5X7.character_size.width as i32
@@ -255,6 +295,8 @@ impl<'a> Canvas<'a> {
 
     /// アンチエイリアスの数字フォントを上端 `y` に描き、次の x を返す
     pub fn aa_text(&mut self, font: &AaFont, text: &str, x: i32, y: i32, c: Color) -> i32 {
+        #[cfg(test)]
+        self.record_region(text, x, y, font.text_width(text), i32::from(font.height));
         let mut pen = x;
         for ch in text.chars() {
             if let Some(g) = font.glyph(ch) {
@@ -299,6 +341,8 @@ impl<'a> Canvas<'a> {
 
     /// パレット文字列のアイコン ([`super::icons`]) を (x, y) に描く
     pub fn icon(&mut self, icon: &super::icons::Icon, x: i32, y: i32) {
+        #[cfg(test)]
+        self.record_region("icon", x, y, icon.rows[0].len() as i32, icon.rows.len() as i32);
         for (row, line) in icon.rows.iter().enumerate() {
             for (col, ch) in line.bytes().enumerate() {
                 if let Some((c, a)) = super::icons::ink(ch) {
@@ -312,6 +356,8 @@ impl<'a> Canvas<'a> {
 impl Canvas<'_> {
     /// 1 色のアイコン (`w` の画素を `c` で、他のパレット文字はそのまま)
     pub fn icon_tinted(&mut self, icon: &super::icons::Icon, x: i32, y: i32, c: Color) {
+        #[cfg(test)]
+        self.record_region("icon", x, y, icon.rows[0].len() as i32, icon.rows.len() as i32);
         for (row, line) in icon.rows.iter().enumerate() {
             for (col, ch) in line.bytes().enumerate() {
                 if ch == b'w' {

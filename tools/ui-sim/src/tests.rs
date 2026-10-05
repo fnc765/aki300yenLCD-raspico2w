@@ -226,6 +226,78 @@ fn icons_are_rectangular() {
     }
 }
 
+/// Audit requested text extents before the canvas clips them, including extreme meter values.
+/// The moving ticker intentionally enters/leaves its viewport; fixed widgets must fit completely.
+#[test]
+fn power_widgets_fit_without_clipping_overlap_or_off_center_values() {
+    use crate::power::{self, PowerHistory, PowerTrend};
+    use crate::scenario::{HistoryJson, PowerJson, Scenario};
+    use crate::ui::canvas::Canvas;
+    use crate::ui::screen::{self, Layout};
+    let bg = vec![0; PIXELS];
+    let mut issues = std::collections::BTreeSet::new();
+    for mode in ["large", "graph"] {
+        for expanded in [false, true] {
+            for minutes in power::HISTORY_RANGES {
+                for value in [Some(0), Some(50), Some(343300), Some(999900), Some(3680000),
+                    Some(-3680000), Some(100000000000000), Some(i64::MAX), Some(i64::MIN), None] {
+                    let mut sc = Scenario::default();
+                    sc.power_display = mode.into();
+                    sc.power_minutes = minutes;
+                    sc.power = Some(PowerJson { milliwatts: value, status: if value.is_some() { "stale" } else { "waiting" }.into(), age_secs: 20 });
+                    sc.status.expanded = expanded;
+                    sc.clock.as_mut().unwrap().month = 12;
+                    sc.clock.as_mut().unwrap().day = 31;
+                    sc.clock.as_mut().unwrap().hour = 23;
+                    sc.clock.as_mut().unwrap().minute = 59;
+                    sc.clock.as_mut().unwrap().second = 59;
+                    sc.weather.as_mut().unwrap().temperature = -99.9;
+                    sc.weather.as_mut().unwrap().code = 99;
+                    sc.message.clear();
+                    sc.power_history = vec![HistoryJson { at_secs: 60, milliwatts: value }];
+                    let mut history = PowerHistory::new();
+                    let mut trend = PowerTrend::new();
+                    history.record(60, value);
+                    history.plot(60, minutes, &mut trend);
+                    let text = sc.scroll_text();
+                    let mut view = sc.view(0, 0, &text);
+                    view.power_trend = Some(&trend);
+                    let mut pixels = vec![0; PIXELS];
+                    let mut canvas = Canvas::new(&mut pixels);
+                    canvas.audit_layout();
+                    screen::render(&mut canvas, &bg, 32, &view, Layout::Glass);
+                    let cutoff = if expanded { 61 } else { 74 };
+                    let regions: Vec<_> = canvas.draw_regions().iter().filter(|r| r.bounds.y0 < cutoff).collect();
+                    for (i, r) in regions.iter().enumerate() {
+                        let b = r.bounds;
+                        let c = r.clip;
+                        if b.x0 < c.x0 || b.y0 < c.y0 || b.x1 > c.x1 || b.y1 > c.y1 {
+                            issues.insert(format!("{mode}/{expanded}: clipped {} {:?} inside {:?}", r.label, b, c));
+                        }
+                        for other in &regions[..i] {
+                            let a = other.bounds;
+                            if b.x0.max(a.x0) < b.x1.min(a.x1) && b.y0.max(a.y0) < b.y1.min(a.y1) {
+                                issues.insert(format!("{mode}/{expanded}: {} overlaps {}", r.label, other.label));
+                            }
+                        }
+                        // Axis labels must also stay clear of the plot starting at x=53.
+                        if mode == "graph" && b.x0 == 10 && b.y0 >= 32 && b.x1 > 49 {
+                            issues.insert(format!("axis label overlaps plot: {}", r.label));
+                        }
+                    }
+                    let number = value.map(power::watts);
+                    let number = number.as_ref().map(|n| n.trim_end_matches(" W")).unwrap_or("--");
+                    let r = regions.iter().find(|r| r.label.as_str() == number && r.bounds.y0 < 30).unwrap();
+                    let unit = regions.iter().find(|r| r.label.as_str() == "W").unwrap();
+                    // Full number plus unit centered in the left panel [4,228), to one pixel.
+                    assert!(((r.bounds.x0 - 4) - (228 - unit.bounds.x1)).abs() <= 1);
+                }
+            }
+        }
+    }
+    assert!(issues.is_empty(), "{}", issues.into_iter().collect::<Vec<_>>().join("\n"));
+}
+
 #[test]
 fn aafont_tables_consistent() {
     for font in [&CLOCK, &MEDIUM, &SMALL] {
