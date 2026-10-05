@@ -24,6 +24,7 @@ pub mod canvas;
 pub mod color;
 pub mod icons;
 pub mod recovery;
+pub mod rotation;
 pub mod screen;
 pub mod scroll;
 pub mod slide;

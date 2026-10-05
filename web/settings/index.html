@@ -313,6 +313,12 @@ ul.results button span { color: var(--muted); font: 12px var(--mono); white-spac
               <span class="mini" style="filter:brightness(.55)"><b style="left:3%;top:8%;width:36%;height:30%"></b><b style="left:50%;top:10%;width:30%;height:10%"></b><b style="left:1%;top:57%;width:98%;height:10%"></b></span>
               <span class="name">Classic</span><span class="desc">0.3 の配置、写真は暗く敷く</span></label>
           </div>
+          <label class="field">画面の向き
+            <select id="f-rotate">
+              <option value="0">通常</option>
+              <option value="180">180度回転（デバイスを逆さに置く）</option>
+            </select>
+          </label>
           <label class="field">写真の切り替え間隔
             <select id="f-slide">
               <option value="0">切り替えない</option>
@@ -583,7 +589,7 @@ let files = [];      // SD の BMP [{name,size}]
 let photoState = []; // 並び [{name,size,use}]
 let photosLoaded = false;
 
-const FIELDS = ['place', 'lat', 'lon', 'tz', 'layout', 'slide', 'status', 'scroll', 'message', 'message_url', 'images', 'show_settings'];
+const FIELDS = ['place', 'lat', 'lon', 'tz', 'layout', 'rotate', 'slide', 'status', 'scroll', 'message', 'message_url', 'images', 'show_settings'];
 
 function current() {
   const radio = (n) => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
@@ -594,6 +600,7 @@ function current() {
     lon: Number($('f-lon').value).toFixed(4),
     tz: tzLabel(Number($('f-tz').value)),
     layout: radio('layout'),
+    rotate: $('f-rotate').value,
     slide: $('f-slide').value,
     status: radio('status'),
     scroll: $('f-scroll').value,
@@ -612,6 +619,7 @@ function base() {
     lon: Number(b.lon).toFixed(4),
     tz: tzLabel(b.tz_offset_secs),
     layout: b.layout,
+    rotate: String(b.rotate || 0),
     slide: String(b.slide),
     status: b.status,
     scroll: String(b.scroll),
@@ -664,6 +672,7 @@ function fillForm(s) {
     $('f-tz').appendChild(o); $('f-tz').value = o.value;
   }
   ($('l-' + s.layout) || $('l-glass')).checked = true;
+  $('f-rotate').value = String(s.rotate || 0);
   $('f-slide').value = String(s.slide);
   if (!$('f-slide').value) {
     const o = document.createElement('option');
@@ -694,7 +703,7 @@ function refreshUi() {
   $('c-message').classList.toggle('over', mb > 512);
   const d = diff();
   const n = Object.keys(d).length;
-  const map = { place: 'f-place', lat: 'f-lat', lon: 'f-lon', tz: 'f-tz', slide: 'f-slide', message: 'f-message', message_url: 'f-message_url' };
+  const map = { place: 'f-place', lat: 'f-lat', lon: 'f-lon', tz: 'f-tz', rotate: 'f-rotate', slide: 'f-slide', message: 'f-message', message_url: 'f-message_url' };
   for (const [k, id] of Object.entries(map)) $(id).classList.toggle('changed', k in d);
   $('save-msg').innerHTML = n ? `<b>未保存の変更 ${n} 件</b> (${Object.keys(d).map(labelOf).join('、')})` : '変更はありません';
   $('btn-save').disabled = !n;
@@ -703,7 +712,7 @@ function refreshUi() {
 }
 
 function labelOf(k) {
-  return { place: '地名', lat: '緯度', lon: '経度', tz: '時差', layout: '画面構成', slide: '切り替え間隔', status: '状態表示', scroll: '速さ', message: '文字', message_url: 'URL', images: '写真の並び', show_settings: '設定 URL の表示' }[k] || k;
+  return { place: '地名', lat: '緯度', lon: '経度', tz: '時差', layout: '画面構成', rotate: '画面の向き', slide: '切り替え間隔', status: '状態表示', scroll: '速さ', message: '文字', message_url: 'URL', images: '写真の並び', show_settings: '設定 URL の表示' }[k] || k;
 }
 
 function validate(c) {
@@ -1058,6 +1067,7 @@ function paintLcd() {
   const c = loaded ? current() : null;
   const lcd = $('lcd');
   if (c) lcd.className = 'lcd ' + c.layout;
+  lcd.style.transform = c && c.rotate === '180' ? 'rotate(180deg)' : '';
   const ctx = $('lcd-bg').getContext('2d');
   const first = photoState.find((p) => p.use && thumbs.get(p.name));
   if (first) {

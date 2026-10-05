@@ -11,6 +11,7 @@
 //! slide=30         # 写真の切り替え間隔 (秒、0 で切り替えない。5〜3600)          (v0.4.0〜)
 //! images=A.BMP,B.BMP  # 背景に使う BMP (SD のルート、8.3 形式、最大 16)。無ければルートの *.BMP 全部
 //! layout=glass     # 画面構成 glass / dock / classic (docs/ticker.md「画面」)
+//! rotate=0         # 画面全体の向き: 0 = 通常 / 180 = デバイスを逆さに置く
 //! status=auto      # 状態 3 行の表示 auto (必要なときだけ) / full (常に) / compact (常に 1 行)
 //! sdfast=1         # 写真を読むときの SD の速さ 1 = 速い (読み誤りがあれば自動で 0 に戻す) / 0 = 起動時と同じ低速
 //! debug_crash=ota  # 試験用 (0.4.2〜): boot / ota / slideshow の場所でわざと panic する。既定は無し
@@ -93,6 +94,8 @@ pub struct TickerConfig {
     /// `images=` の値 (カンマ区切り、空ならルートの *.BMP)
     pub images: String<IMAGES_MAX>,
     pub layout: LayoutName,
+    /// 文字・背景を含む画面全体を 180 度回転する (`rotate=180`)。
+    pub rotate_180: bool,
     pub status: StatusMode,
     /// 写真の読み込みで SD を速く読むか
     pub sd_fast: bool,
@@ -121,6 +124,7 @@ impl Default for TickerConfig {
             slide_secs: DEFAULT_SLIDE_SECS,
             images: String::new(),
             layout: LayoutName::Glass,
+            rotate_180: false,
             status: StatusMode::Auto,
             sd_fast: true,
             debug_crash: DebugCrash::None,
@@ -199,6 +203,12 @@ impl TickerConfig {
                     None
                 };
                 layout.map(|l| config.layout = l).is_some()
+            } else if key.eq_ignore_ascii_case("rotate") {
+                match value {
+                    "0" => { config.rotate_180 = false; true }
+                    "180" => { config.rotate_180 = true; true }
+                    _ => false,
+                }
             } else if key.eq_ignore_ascii_case("status") {
                 let mode = if value.eq_ignore_ascii_case("auto") {
                     Some(StatusMode::Auto)

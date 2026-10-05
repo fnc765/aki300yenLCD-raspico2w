@@ -26,6 +26,7 @@ PIO + DMA で駆動し、その表示を持ったファームウェアを **Wi-F
   ([settings-server.md](docs/settings-server.md))。v0.5.1 からは URL とアクセスコードが流れる文字の中に毎周流れます
   (`ticker.txt` の `show_settings=0` か設定ページで止められます)。
   v0.6.1 では、Pico 2 W が同じ LAN の Tapo P110M から Matter 経由で消費電力を読み、時計の下に表示します。
+  v0.6.2 からは設定ページの「画面の向き」で画面全体を180度回転でき、デバイスを逆さに置いて使えます (SD の `rotate=180`、既定 `0`)。
   PC やクラウドの中継は不要です ([matter-power.md](docs/matter-power.md))。
 
 ## ハードウェア

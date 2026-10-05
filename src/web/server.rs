@@ -915,8 +915,8 @@ impl Route {
 }
 
 /// 設定ページが送ってよい設定の名前 (ticker.txt のキー。debug_crash / sdfast は手で書くものなので受けない)
-const SETTING_KEYS: [&str; 12] = [
-    "place", "lat", "lon", "tz", "layout", "slide", "status", "scroll", "message", "message_url", "images", "show_settings",
+const SETTING_KEYS: [&str; 13] = [
+    "place", "lat", "lon", "tz", "layout", "rotate", "slide", "status", "scroll", "message", "message_url", "images", "show_settings",
 ];
 
 /// 要求ヘッダから写した値 (本文を読む間、`w.head` を借りたままにしないため、位置だけを持つ)
@@ -1066,6 +1066,7 @@ fn write_settings(j: &mut Json<'_>, app: &impl App, sd: bool) {
         },
     );
     j.field_int("slide", i64::from(c.slide_secs));
+    j.field_int("rotate", if c.rotate_180 { 180 } else { 0 });
     j.field_str(
         "status",
         match c.status {

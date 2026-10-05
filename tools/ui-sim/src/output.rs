@@ -111,7 +111,16 @@ pub fn render_frame(sc: &Scenario, bg: &[u16], bg_level: u8, layout: Layout, ext
     let text = sc.scroll_text();
     let view = sc.view(extra_secs, scroll_x, &text);
     screen::render(&mut canvas, bg, bg_level, &view, layout);
-    px
+    if sc.rotate == 180 {
+        let mut rotated = vec![0u16; PIXELS];
+        for y in 0..HEIGHT {
+            let row = crate::ui::rotation::source_row(y, HEIGHT, true);
+            crate::ui::rotation::copy_pixels(&px[row * WIDTH..(row + 1) * WIDTH], &mut rotated[y * WIDTH..(y + 1) * WIDTH], true, core::convert::identity);
+        }
+        rotated
+    } else {
+        px
+    }
 }
 
 /// RGB565 → LCD が表示する RGB888 (拡大率 `scale`、最近傍)

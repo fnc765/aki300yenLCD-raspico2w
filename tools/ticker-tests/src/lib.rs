@@ -107,6 +107,7 @@ mod tests {
         assert_eq!(c.place.as_str(), "東京");
         assert_eq!(c.tz_offset_secs, 32_400);
         assert_eq!(c.scroll_px, 1);
+        assert!(!c.rotate_180);
         assert_eq!(c.message_url.as_str(), config::DEFAULT_MESSAGE_URL);
 
         let text = "\u{feff}# comment\r\nLAT = 43.0621 # sapporo\r\nlon=141.3544\r\ntz=+09:00\r\nplace=札幌\r\nscroll=2\r\nmessage_url=https://example.com/m.txt\r\nbogus=1\r\n";
@@ -123,6 +124,23 @@ mod tests {
         let (c, any) = config::TickerConfig::parse(b"lat=999\nlon=abc\ntz=+30\nscroll=0\nmessage_url=ftp://x\nplace=\n");
         assert!(!any);
         assert_eq!(c, config::TickerConfig::default());
+    }
+
+    #[test]
+    fn config_rotation_round_trip() {
+        let old = b"# keep this comment\nrotate=0\nmessage=hello\n";
+        let mut out = [0u8; 256];
+        let n = config::rewrite(old, &[("rotate", Some("180"))], &mut out).unwrap();
+        let (c, any) = config::TickerConfig::parse(&out[..n]);
+        assert!(any && c.rotate_180);
+        assert_eq!(config::message_text(&out[..n]), Some("hello"));
+        assert!(out[..n].starts_with(b"# keep this comment\n"));
+        let (c, any) = config::TickerConfig::parse(b"ROTATE = 0 # normal\n");
+        assert!(any && !c.rotate_180);
+        for value in ["90", "-180", "360", "yes", ""] {
+            let (c, any) = config::TickerConfig::parse(format!("rotate={value}\n").as_bytes());
+            assert!(!any && !c.rotate_180, "{value}");
+        }
     }
 
     #[test]
