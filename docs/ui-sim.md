@@ -60,6 +60,7 @@ cargo test --release
 |---|---|
 | `default.json` | 平常時 (状態は小さな 1 行)。GIF は SUNSET → BOKEH の切り替え |
 | `rotate-180.json` | v0.6.2〜: 時計・天気・電力・流れる文字・背景を含む画面全体を180度回転 (`rotate: 180`、省略時は通常の向き) |
+| `power-large.json` / `power-graph.json` | v0.6.3〜: 大きい電力表示 / 推移グラフ。グラフの見本は5秒間隔のサンプル値と欠測区間を含む |
 | `boot.json` | 起動直後: 時刻・天気が未取得、写真なし (既定のグラデーション)、状態 3 行 |
 | `ota.json` | OTA のダウンロード中 (状態 3 行 + 進捗バー)、雪、氷点下 |
 | `error.json` | 天気の取得失敗 (`WX` が赤)、雷雨 |
@@ -69,6 +70,11 @@ cargo test --release
 ```jsonc
 {
   "layout": "glass",                         // glass / dock / classic (ticker.txt の layout=)
+  "power_display": "graph",                  // normal (既定) / large / graph
+  "power_minutes": 5,                        // 1 / 5 / 30 / 60 / 360 / 1440 分
+  "power": { "milliwatts": 343300, "status": "fresh", "age_secs": 0 }, // null = Matter 無効
+  "power_now_secs": 10,                      // 起動からの経過時間。履歴は NTP 時計を使わない
+  "power_history": [{ "at_secs": 0, "milliwatts": 310000 }, { "at_secs": 5, "milliwatts": null }, { "at_secs": 10, "milliwatts": 343300 }],
   "background": "../samples/SUNSET.BMP",     // シナリオのファイルからの相対パス。null で既定のグラデーション
   "next_background": "../samples/BOKEH.BMP", // GIF で切り替える先 (null なら切り替えなし)
   "bg_level": 32,                            // 背景の明るさ 0..32
@@ -101,6 +107,8 @@ cargo test --release
 ```
 
 天気の日本語はファームウェアと同じ表 (`src/ticker/weather.rs`) から、アイコンは天気コードと時刻 (18〜6 時は月) から決まります。
+電力履歴の集計も本体の `src/ticker/power.rs` を使う。`power_history` は経過時間順で指定し、
+`null` または測定の無いバケットを欠測として扱う。GIF では経過時間も進むため、新しい測定が無ければ右端に欠測が増える。
 
 ## 見本の背景 (`samples/`)
 

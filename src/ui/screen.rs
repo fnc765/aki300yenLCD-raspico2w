@@ -15,7 +15,7 @@ use super::icons;
 use super::scroll::{self, Ink, Line};
 use super::{HEIGHT, WIDTH};
 use crate::font::shinonome;
-use crate::ticker::power::{self, PowerStatus, PowerView};
+use crate::ticker::power::{self, PowerDisplay, PowerStatus, PowerTrend, PowerView};
 
 /// 状態の色分け (`ota::app::Tone` と同じ段階)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,6 +91,8 @@ pub struct View<'a> {
     /// NTP 同期前は None
     pub clock: Option<Clock>,
     pub power: PowerView,
+    pub power_display: PowerDisplay,
+    pub power_trend: Option<&'a PowerTrend>,
     pub place: &'a str,
     /// 取得前は None
     pub weather: Option<WeatherView<'a>>,
@@ -201,12 +203,106 @@ fn fmt_temp(out: &mut String<16>, v: Option<f32>) {
 /// 背景 (明るさ `bg_level` 0..=32) と `view` を描く
 pub fn render(canvas: &mut Canvas, bg: &[Color], bg_level: u8, view: &View, layout: Layout) {
     background::copy_dimmed(bg, canvas.pixels_mut(), bg_level);
+    if view.power.status != PowerStatus::Disabled && view.power_display != PowerDisplay::Normal {
+        render_power_focus(canvas, view);
+        canvas.reset_clip();
+        return;
+    }
     match layout {
         Layout::Glass => render_glass(canvas, view),
         Layout::Dock => render_dock(canvas, view),
         Layout::Classic => render_classic(canvas, view),
     }
     canvas.reset_clip();
+}
+
+/// Power-focused views use the Glass lower band so the scrolling width matches its drawn area.
+pub fn effective_layout(layout: Layout, display: PowerDisplay, status: PowerStatus) -> Layout {
+    if display != PowerDisplay::Normal && status != PowerStatus::Disabled { Layout::Glass } else { layout }
+}
+
+fn render_power_focus(c: &mut Canvas, view: &View) {
+    let graph = view.power_display == PowerDisplay::Graph;
+    let height = if view.status.expanded { 55 } else { 68 };
+    c.panel(4, 4, 224, height, &GLASS_PANEL);
+    c.set_clip(Clip::new(8, 6, 216, height - 3));
+    c.tiny("P110M", 11, 9, palette::SOFT);
+    let color = if view.power.status == PowerStatus::Fresh { palette::AQUA } else { palette::MUTED };
+    let value = view.power.milliwatts.map(power::watts);
+    let number = value.as_ref().map(|v| v.trim_end_matches(" W")).unwrap_or("--");
+    let font = if graph || view.status.expanded || CLOCK.text_width(number) > 202 { &MEDIUM } else { &CLOCK };
+    let font = if font.text_width(number) > 202 { &SMALL } else { font };
+    let width = font.text_width(number) + 10;
+    let nx = 4 + (224 - width) / 2;
+    let ny = if graph { 5 } else { 19 };
+    let end = c.aa_text(font, number, nx, ny, color);
+    c.small("W", end + 4, ny + font.baseline as i32 - 8, color);
+    let label = match view.power.status {
+        PowerStatus::Fresh => "", PowerStatus::Stale => "old", PowerStatus::Waiting => "wait",
+        PowerStatus::Unavailable => "n/a", PowerStatus::Unsupported => "no meter",
+        PowerStatus::ConfigError => "config", PowerStatus::Disabled => "",
+    };
+    c.tiny(label, 11, 19, color);
+    c.reset_clip();
+    if graph && let Some(trend) = view.power_trend {
+        draw_power_trend(c, trend, height);
+    }
+    // Compact clock, date and weather keep the other information visible beside the larger meter.
+    c.panel(234, 4, 162, height, &GLASS_PANEL);
+    c.set_clip(Clip::new(240, 5, 150, height - 2));
+    let mut time: String<16> = String::new();
+    if let Some(t) = view.clock { let _ = write!(time, "{:02}:{:02}", t.hour, t.minute); }
+    else { let _ = time.push_str("--:--"); }
+    let end = c.aa_text(&MEDIUM, &time, 242, 5, palette::WHITE);
+    if let Some(t) = view.clock {
+        time.clear();
+        let _ = write!(time, ":{:02}", t.second);
+        c.aa_text(&SMALL, &time, end + 2,
+            5 + i32::from(MEDIUM.baseline) - i32::from(SMALL.baseline), palette::SOFT);
+    }
+    c.jp(&date_text(view.clock), 242, 25, palette::OFF_WHITE);
+    if let Some(w) = view.weather {
+        let y = if view.status.expanded { 43 } else { 41 };
+        c.icon(icons::weather_icon(w.code, is_night(view.clock)), 241, y);
+        let mut text: String<16> = String::new();
+        fmt_temp(&mut text, Some(w.temperature));
+        let _ = text.push('°');
+        c.aa_text(&SMALL, &text, 261, y + 1, palette::ACCENT);
+        if !view.status.expanded { c.jp(w.condition, 242, 56, palette::OFF_WHITE); }
+    }
+    c.reset_clip();
+    draw_glass_band(c, view);
+}
+
+fn draw_power_trend(c: &mut Canvas, trend: &PowerTrend, height: i32) {
+    let (x, y, w, h) = (53, 32, 165, height - 40);
+    c.set_clip(Clip::new(8, 30, 214, height - 27));
+    c.fill_rect(x, y + h - 1, w, 1, palette::FAINT);
+    c.blend_rect(x, y, w, 1, palette::WHITE, 5);
+    c.blend_rect(x, y + h / 2, w, 1, palette::WHITE, 4);
+    let upper = power::watts(i64::from(trend.max) * 100);
+    let lower = power::watts(i64::from(trend.min) * 100);
+    c.tiny(upper.trim_end_matches(" W"), 10, y, palette::MUTED);
+    c.tiny(lower.trim_end_matches(" W"), 10, y + h - 7, palette::MUTED);
+    let scale = (i64::from(trend.max) - i64::from(trend.min)).max(1);
+    let mut previous: Option<(i32, i32, bool)> = None;
+    for (i, &value) in trend.points.iter().enumerate() {
+        if value == power::MISSING { previous = None; continue; }
+        let px = x + i as i32 * (w - 1) / (power::TREND_POINTS as i32 - 1);
+        let py = y + h - 1 - ((i64::from(value) - i64::from(trend.min)) * i64::from(h - 1) / scale) as i32;
+        if let Some((ax, ay, complete)) = previous && complete && trend.complete[i] {
+            // Bounded step segments, with gaps preserved; no frame-time interpolation buffers.
+            let lo = ay.min(py);
+            c.fill_rect(ax, ay, (px - ax).max(1), 1, palette::AQUA);
+            c.fill_rect(px, lo, 1, (ay - py).abs() + 1, palette::AQUA);
+        }
+        c.put(px, py, palette::AQUA);
+        previous = Some((px, py, trend.complete[i]));
+    }
+    if !trend.has_data { c.tiny("collecting...", x + 28, y + (h - 7) / 2, palette::MUTED); }
+    c.tiny(power::range_label(trend.minutes), x, y + h + 2, palette::SOFT);
+    c.tiny("now", x + w - 15, y + h + 2, palette::SOFT);
+    c.reset_clip();
 }
 
 // ============================================================
@@ -473,6 +569,10 @@ fn render_glass(c: &mut Canvas, view: &View) {
         }
     }
 
+    draw_glass_band(c, view);
+}
+
+fn draw_glass_band(c: &mut Canvas, view: &View) {
     // --- 下: 3 行の状態 (展開時) または 流れる文字の帯 + 小さな状態 ---
     if view.status.expanded {
         let y = GLASS_CARD_Y + GLASS_CARD_H + 3;

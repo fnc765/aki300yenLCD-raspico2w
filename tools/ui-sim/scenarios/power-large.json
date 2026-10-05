@@ -1,0 +1,7 @@
+{
+  "power_display": "large",
+  "power": {"milliwatts": 343336, "status": "fresh"},
+  "background": "../samples/SUNSET.BMP",
+  "message": "大きな電力表示。時計・天気は右側に。",
+  "status": {"version": "v0.6.3"}
+}
