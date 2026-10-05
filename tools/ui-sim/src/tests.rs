@@ -313,6 +313,24 @@ fn aafont_tables_consistent() {
     assert!(HEIGHT >= CLOCK.height as usize);
 }
 
+/// Numeric readouts need visible punctuation, not just an advance width for missing glyphs.
+#[test]
+fn numeric_fonts_render_decimal_points_and_minus_signs() {
+    use crate::ui::canvas::Canvas;
+    for font in [&CLOCK, &MEDIUM, &SMALL] {
+        for ch in "0123456789.-".chars() {
+            let glyph = font.glyph(ch).unwrap_or_else(|| panic!("missing numeric glyph: {ch}"));
+            assert!(glyph.alpha.iter().any(|&a| a != 0), "empty numeric glyph: {ch}");
+        }
+        for text in [".", "-"] {
+            let mut pixels = vec![0; PIXELS];
+            let mut canvas = Canvas::new(&mut pixels);
+            canvas.aa_text(font, text, 20, 10, 0xffff);
+            assert!(pixels.iter().any(|&p| p != 0), "invisible punctuation: {text}");
+        }
+    }
+}
+
 #[test]
 fn every_layout_renders_all_states() {
     use crate::scenario::Scenario;
