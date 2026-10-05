@@ -226,15 +226,18 @@ fn render_power_focus(c: &mut Canvas, view: &View) {
     let height = if view.status.expanded { 55 } else { 68 };
     c.panel(4, 4, 224, height, &GLASS_PANEL);
     c.set_clip(Clip::new(8, 6, 216, height - 3));
-    c.tiny("P110M", 11, 9, palette::SOFT);
+    let header_y = if graph { 12 } else { 9 };
+    c.tiny("P110M", 11, header_y, palette::SOFT);
     let color = if view.power.status == PowerStatus::Fresh { palette::AQUA } else { palette::MUTED };
     let value = view.power.milliwatts.map(power::watts);
     let number = value.as_ref().map(|v| v.trim_end_matches(" W")).unwrap_or("--");
     let font = if graph || view.status.expanded || CLOCK.text_width(number) > 202 { &MEDIUM } else { &CLOCK };
-    let font = if font.text_width(number) > 202 { &SMALL } else { font };
+    // Keep the graph's centered value clear of the small device/status labels.
+    let number_limit = if graph { 138 } else { 202 };
+    let font = if font.text_width(number) > number_limit { &SMALL } else { font };
     let width = font.text_width(number) + 10;
     let nx = 4 + (224 - width) / 2;
-    let ny = if graph { 5 } else { 19 };
+    let ny = if graph { 8 } else { 19 };
     let end = c.aa_text(font, number, nx, ny, color);
     c.small("W", end + 4, ny + font.baseline as i32 - 8, color);
     let label = match view.power.status {
@@ -242,25 +245,25 @@ fn render_power_focus(c: &mut Canvas, view: &View) {
         PowerStatus::Unavailable => "n/a", PowerStatus::Unsupported => "no meter",
         PowerStatus::ConfigError => "config", PowerStatus::Disabled => "",
     };
-    c.tiny(label, 11, 19, color);
+    c.tiny(label, 224 - label.len() as i32 * 5, header_y, color);
     c.reset_clip();
     if graph && let Some(trend) = view.power_trend {
         draw_power_trend(c, trend, height);
     }
     // Compact clock, date and weather keep the other information visible beside the larger meter.
     c.panel(234, 4, 162, height, &GLASS_PANEL);
-    c.set_clip(Clip::new(240, 5, 150, height - 2));
+    c.set_clip(Clip::new(240, 6, 150, height - 3));
     let mut time: String<16> = String::new();
     if let Some(t) = view.clock { let _ = write!(time, "{:02}:{:02}", t.hour, t.minute); }
     else { let _ = time.push_str("--:--"); }
-    let end = c.aa_text(&MEDIUM, &time, 242, 5, palette::WHITE);
+    let end = c.aa_text(&MEDIUM, &time, 242, 8, palette::WHITE);
     if let Some(t) = view.clock {
         time.clear();
         let _ = write!(time, ":{:02}", t.second);
         c.aa_text(&SMALL, &time, end + 2,
-            5 + i32::from(MEDIUM.baseline) - i32::from(SMALL.baseline), palette::SOFT);
+            8 + i32::from(MEDIUM.baseline) - i32::from(SMALL.baseline), palette::SOFT);
     }
-    c.jp(&date_text(view.clock), 242, 25, palette::OFF_WHITE);
+    c.jp(&date_text(view.clock), 242, 26, palette::OFF_WHITE);
     if let Some(w) = view.weather {
         let y = if view.status.expanded { 43 } else { 41 };
         c.icon(icons::weather_icon(w.code, is_night(view.clock)), 241, y);
@@ -279,11 +282,12 @@ fn draw_power_trend(c: &mut Canvas, trend: &PowerTrend, height: i32) {
     c.set_clip(Clip::new(8, 30, 214, height - 27));
     c.fill_rect(x, y + h - 1, w, 1, palette::FAINT);
     c.blend_rect(x, y, w, 1, palette::WHITE, 5);
-    c.blend_rect(x, y + h / 2, w, 1, palette::WHITE, 4);
-    let upper = power::watts(i64::from(trend.max) * 100);
-    let lower = power::watts(i64::from(trend.min) * 100);
-    c.tiny(upper.trim_end_matches(" W"), 10, y, palette::MUTED);
-    c.tiny(lower.trim_end_matches(" W"), 10, y + h - 7, palette::MUTED);
+    // The empty-state label occupies the middle; avoid a grid line through its glyphs.
+    if trend.has_data { c.blend_rect(x, y + h / 2, w, 1, palette::WHITE, 4); }
+    let upper = power_axis_label(trend.max);
+    let lower = power_axis_label(trend.min);
+    c.tiny(&upper, 10, y, palette::MUTED);
+    c.tiny(&lower, 10, y + h - 7, palette::MUTED);
     let scale = (i64::from(trend.max) - i64::from(trend.min)).max(1);
     let mut previous: Option<(i32, i32, bool)> = None;
     for (i, &value) in trend.points.iter().enumerate() {
@@ -303,6 +307,17 @@ fn draw_power_trend(c: &mut Canvas, trend: &PowerTrend, height: i32) {
     c.tiny(power::range_label(trend.minutes), x, y + h + 2, palette::SOFT);
     c.tiny("now", x + w - 15, y + h + 2, palette::SOFT);
     c.reset_clip();
+}
+
+/// Keep wide axis values inside the label gutter; k/M are prefixes for the graph's W scale.
+fn power_axis_label(deciwatts: i32) -> String<32> {
+    let magnitude = deciwatts.unsigned_abs();
+    let (scale, suffix) = if magnitude >= 10_000_000 { (1_000_000, "M") }
+        else if magnitude >= 100_000 { (1_000, "k") } else { (1, "") };
+    let mut text = power::watts(i64::from(deciwatts) * 100 / scale);
+    text.truncate(text.len() - 2); // Numeric ASCII followed by " W".
+    let _ = text.push_str(suffix);
+    text
 }
 
 // ============================================================
