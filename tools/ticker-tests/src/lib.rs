@@ -63,6 +63,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn power_display_and_all_graph_periods_save_without_resetting_other_settings() {
+        for minutes in power::HISTORY_RANGES {
+            let text = format!("rotate=180\nlayout=dock\npower_display=graph\npower_minutes={minutes}\n");
+            let (cfg, any) = config::TickerConfig::parse(text.as_bytes());
+            assert!(any);
+            assert_eq!(cfg.power_display, power::PowerDisplay::Graph);
+            assert_eq!(cfg.power_minutes, minutes);
+            assert!(cfg.rotate_180);
+            assert_eq!(cfg.layout, config::LayoutName::Dock);
+            assert!(config::valid_value("power_minutes", &minutes.to_string()));
+        }
+        for invalid in ["0", "2", "61", "1441", "-1", "yes"] {
+            assert!(!config::valid_value("power_minutes", invalid));
+        }
+        assert!(!config::valid_value("power_display", "huge"));
+        let mut out = [0u8; config::CONFIG_MAX];
+        let n = config::rewrite(b"# keep\nmessage=hello\nrotate=180\n", &[("power_display", Some("large")), ("power_minutes", Some("1"))], &mut out).unwrap();
+        let (cfg, _) = config::TickerConfig::parse(&out[..n]);
+        assert_eq!(cfg.power_display, power::PowerDisplay::Large);
+        assert_eq!(cfg.power_minutes, 1);
+        assert!(cfg.rotate_180 && cfg.local_message);
+        assert!(core::str::from_utf8(&out[..n]).unwrap().contains("# keep\n"));
+    }
+
+    #[test]
     fn civil_known_epochs() {
         // 1970-01-01 (木)
         let dt = civil::from_unix(0, 0);

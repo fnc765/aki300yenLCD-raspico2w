@@ -12,6 +12,8 @@
 //! images=A.BMP,B.BMP  # 背景に使う BMP (SD のルート、8.3 形式、最大 16)。無ければルートの *.BMP 全部
 //! layout=glass     # 画面構成 glass / dock / classic (docs/ticker.md「画面」)
 //! rotate=0         # 画面全体の向き: 0 = 通常 / 180 = デバイスを逆さに置く
+//! power_display=normal  # 電力表示 normal / large / graph (大きく＋グラフ)
+//! power_minutes=5   # グラフ期間 (分): 1 / 5 / 30 / 60 / 360 / 1440
 //! status=auto      # 状態 3 行の表示 auto (必要なときだけ) / full (常に) / compact (常に 1 行)
 //! sdfast=1         # 写真を読むときの SD の速さ 1 = 速い (読み誤りがあれば自動で 0 に戻す) / 0 = 起動時と同じ低速
 //! debug_crash=ota  # 試験用 (0.4.2〜): boot / ota / slideshow の場所でわざと panic する。既定は無し
@@ -27,6 +29,7 @@
 //! TBYB の buy 待ち (OTA で届いたばかりの版) と回復モードでは無視する (回復モードは ticker.txt を読まない)。
 
 use heapless::String;
+use super::power::{PowerDisplay, HISTORY_RANGES};
 
 /// 地名の最大長 (バイト)
 pub const PLACE_MAX: usize = 32;
@@ -96,6 +99,8 @@ pub struct TickerConfig {
     pub layout: LayoutName,
     /// 文字・背景を含む画面全体を 180 度回転する (`rotate=180`)。
     pub rotate_180: bool,
+    pub power_display: PowerDisplay,
+    pub power_minutes: u16,
     pub status: StatusMode,
     /// 写真の読み込みで SD を速く読むか
     pub sd_fast: bool,
@@ -125,6 +130,8 @@ impl Default for TickerConfig {
             images: String::new(),
             layout: LayoutName::Glass,
             rotate_180: false,
+            power_display: PowerDisplay::Normal,
+            power_minutes: 5,
             status: StatusMode::Auto,
             sd_fast: true,
             debug_crash: DebugCrash::None,
@@ -209,6 +216,11 @@ impl TickerConfig {
                     "180" => { config.rotate_180 = true; true }
                     _ => false,
                 }
+            } else if key.eq_ignore_ascii_case("power_display") {
+                PowerDisplay::parse(value).map(|v| config.power_display = v).is_some()
+            } else if key.eq_ignore_ascii_case("power_minutes") {
+                value.parse::<u16>().ok().filter(|v| HISTORY_RANGES.contains(v))
+                    .map(|v| config.power_minutes = v).is_some()
             } else if key.eq_ignore_ascii_case("status") {
                 let mode = if value.eq_ignore_ascii_case("auto") {
                     Some(StatusMode::Auto)

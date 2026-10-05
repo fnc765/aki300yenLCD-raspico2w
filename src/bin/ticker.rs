@@ -99,7 +99,7 @@ use pico2w_300yen_lcd::supervisor;
 use pico2w_300yen_lcd::ticker::civil;
 use pico2w_300yen_lcd::ticker::config::{self, ConfigSource, DebugCrash, LayoutName, StatusMode, TickerConfig};
 use pico2w_300yen_lcd::ticker::health::{self, LastReset, Limits, Who};
-use pico2w_300yen_lcd::ticker::power::{self, PowerConfig, PowerState, PowerStatus};
+use pico2w_300yen_lcd::ticker::power::{self, PowerConfig, PowerDisplay, PowerHistory, PowerState, PowerStatus, PowerTrend};
 use pico2w_300yen_lcd::ticker::slideshow::{self, SlideConfig};
 use pico2w_300yen_lcd::ticker::sntp::{self, SntpError};
 use pico2w_300yen_lcd::ticker::sntp_net::{self, SntpBuffers, Sync};
@@ -262,6 +262,10 @@ struct Shared {
     weather: Option<Weather>,
     power: PowerState,
     power_gen: u32,
+    power_display: PowerDisplay,
+    power_minutes: u16,
+    power_history: PowerHistory,
+    power_trend: PowerTrend,
     place: String<32>,
     /// 流れる文字と、その世代 (変わったらスクロール位置を右端に戻す)
     message: String<MESSAGE_MAX>,
@@ -324,6 +328,10 @@ impl Shared {
             weather: None,
             power: PowerState::new(PowerStatus::Disabled),
             power_gen: 0,
+            power_display: PowerDisplay::Normal,
+            power_minutes: 5,
+            power_history: PowerHistory::new(),
+            power_trend: PowerTrend::new(),
             place: String::new(),
             message: String::new(),
             message_gen: 0,
@@ -511,6 +519,8 @@ fn draw_screen(frame: &mut BackBuffer, bg: &[u16], m: &Shared, scroll_x: i32) {
     let view = View {
         clock,
         power: m.power.view(now.as_millis() as u32),
+        power_display: m.power_display,
+        power_trend: Some(&m.power_trend),
         place: &m.place,
         weather: m.weather.map(|w| WeatherView {
             temperature: w.temperature,
@@ -603,6 +613,7 @@ fn banner_of(m: &Shared, now: Instant) -> Option<Banner<'_>> {
 #[embassy_executor::task]
 async fn render_task(mut display: Display) {
     let mut power_gen = 0;
+    let mut history_key = (u32::MAX, u64::MAX, 0u16);
     let mut message_gen = u32::MAX;
     let mut scroll_key = (u32::MAX, u32::MAX, SettingsPart::Hidden);
     let mut jump_gen = 0u32;
@@ -624,13 +635,20 @@ async fn render_task(mut display: Display) {
         let power_presented = MODEL.lock(|cell| {
             let mut guard = cell.borrow_mut();
             let m = &mut *guard;
+            let now_secs = Instant::now().as_millis() / 1000;
+            let next_history_key = (m.power_gen, now_secs / 5, m.power_minutes);
+            if m.power_display == PowerDisplay::Graph && next_history_key != history_key {
+                m.power_history.plot(now_secs, m.power_minutes, &mut m.power_trend);
+                history_key = next_history_key;
+            }
             let part = settings_part(m, Instant::now());
             let key = (m.message_gen, m.web_gen, part);
             if key != scroll_key {
                 scroll_key = key;
                 compose_scroll(m, part);
             }
-            let (_, scroll_w) = m.layout.scroll_area(false);
+            let effective_layout = screen::effective_layout(m.layout, m.power_display, m.power.status);
+            let (_, scroll_w) = effective_layout.scroll_area(false);
             if m.message_gen != message_gen {
                 message_gen = m.message_gen;
                 scroll_x = scroll_w;
@@ -1240,6 +1258,8 @@ impl web_server::App for WebHost<'_> {
             m.place = new.place.clone();
             m.scroll_px = new.scroll_px;
             m.rotate_180 = new.rotate_180;
+            m.power_display = new.power_display;
+            m.power_minutes = new.power_minutes;
             m.layout = layout;
             m.status_mode = new.status;
             m.show_settings = new.show_settings;
@@ -1331,11 +1351,13 @@ async fn matter_task(stack: Stack<'static>, config: PowerConfig) {
 }
 
 fn publish_power(update: matter::Update) {
-    let now = Instant::now().as_millis() as u32;
+    let now_ms = Instant::now().as_millis();
+    let now = now_ms as u32;
     with_model(|m| {
         match update {
             matter::Update::Sample(value) => {
                 m.power.received(value, now);
+                m.power_history.record(now_ms / 1000, value);
                 if let Some(mw) = value {
                     log::info!("ACTIVE_POWER raw_mW={mw} watts={}", power::watts(mw));
                 } else { log::info!("ACTIVE_POWER_NULL"); }
@@ -2137,6 +2159,9 @@ async fn main(spawner: Spawner) {
         m.place = config.place.clone();
         m.scroll_px = config.scroll_px;
         m.rotate_180 = config.rotate_180;
+        m.power_display = config.power_display;
+        m.power_minutes = config.power_minutes;
+        m.power_trend.minutes = config.power_minutes;
         m.show_settings = config.show_settings;
         m.layout = layout;
         m.status_mode = config.status;

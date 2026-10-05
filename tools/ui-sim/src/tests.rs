@@ -22,6 +22,42 @@ fn lcd_rotation_preserves_rectangular_geometry_and_pixel_conversion() {
 }
 
 #[test]
+fn power_focus_preserves_status_band_and_rotates_large_and_graph_views() {
+    use crate::ui::screen::Layout;
+    use crate::scenario::{HistoryJson, PowerJson, Scenario};
+    use crate::ui::{PIXELS, WIDTH};
+    let mut sc = Scenario::default();
+    sc.power = Some(PowerJson { milliwatts: Some(343300), status: "fresh".into(), age_secs: 0 });
+    sc.power_now_secs = 300;
+    sc.power_history = (0..=300).step_by(5).map(|t| HistoryJson { at_secs: t, milliwatts: Some((t % 100) as i64 * 1000) }).collect();
+    let bg = vec![0; PIXELS];
+    for expanded in [false, true] {
+        sc.status.expanded = expanded;
+        sc.power_display = "normal".into();
+        let normal = crate::output::render_frame(&sc, &bg, 32, Layout::Glass, 0, 0);
+        for mode in ["large", "graph"] {
+            sc.power_display = mode.into();
+            for minutes in crate::power::HISTORY_RANGES {
+                sc.power_minutes = minutes;
+                let frame = crate::output::render_frame(&sc, &bg, 32, Layout::Dock, 0, 0);
+                let row = if expanded { 61 } else { 74 };
+                assert_eq!(&frame[row * WIDTH..], &normal[row * WIDTH..]);
+                assert_ne!(&frame[..row * WIDTH], &normal[..row * WIDTH]);
+                sc.rotate = 180;
+                let rotated = crate::output::render_frame(&sc, &bg, 32, Layout::Dock, 0, 0);
+                assert!(frame.iter().eq(rotated.iter().rev()));
+                sc.rotate = 0;
+            }
+        }
+    }
+    sc.power = None;
+    sc.power_display = "graph".into();
+    let disabled = crate::output::render_frame(&sc, &bg, 32, Layout::Dock, 0, 0);
+    sc.power_display = "normal".into();
+    assert_eq!(disabled, crate::output::render_frame(&sc, &bg, 32, Layout::Dock, 0, 0));
+}
+
+#[test]
 fn screen_rotation_includes_every_widget_and_status_layout() {
     use crate::scenario::{Scenario, PowerJson};
     use crate::ui::screen::Layout;

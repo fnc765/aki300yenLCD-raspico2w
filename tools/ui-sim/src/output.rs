@@ -109,7 +109,12 @@ pub fn render_frame(sc: &Scenario, bg: &[u16], bg_level: u8, layout: Layout, ext
     let mut px = vec![0u16; PIXELS];
     let mut canvas = Canvas::new(&mut px);
     let text = sc.scroll_text();
-    let view = sc.view(extra_secs, scroll_x, &text);
+    let mut view = sc.view(extra_secs, scroll_x, &text);
+    let mut history = crate::power::PowerHistory::new();
+    let mut trend = crate::power::PowerTrend::new();
+    for sample in &sc.power_history { history.record(sample.at_secs, sample.milliwatts); }
+    history.plot(sc.power_now_secs + u64::from(extra_secs), sc.power_minutes, &mut trend);
+    view.power_trend = Some(&trend);
     screen::render(&mut canvas, bg, bg_level, &view, layout);
     if sc.rotate == 180 {
         let mut rotated = vec![0u16; PIXELS];

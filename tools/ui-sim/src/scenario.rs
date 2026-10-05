@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::ui::screen::{Banner, Clock, StatusView, Tone, View, WeatherView};
 use crate::ui::scroll::{self, ScrollText, Settings};
-use crate::power::{PowerStatus, PowerView};
+use crate::power::{PowerDisplay, PowerStatus, PowerView};
 
 #[derive(Deserialize, Clone)]
 #[serde(default)]
@@ -25,6 +25,10 @@ pub struct Scenario {
     /// null なら「天気取得中」
     pub weather: Option<WeatherJson>,
     pub power: Option<PowerJson>,
+    pub power_display: String,
+    pub power_minutes: u16,
+    pub power_history: Vec<HistoryJson>,
+    pub power_now_secs: u64,
     pub message: String,
     /// 流れる文字の位置 (帯の左端からの px)。PNG の静止画に使う
     pub scroll_x: i32,
@@ -90,6 +94,9 @@ pub struct PowerJson {
 }
 
 #[derive(Deserialize, Clone)]
+pub struct HistoryJson { pub at_secs: u64, pub milliwatts: Option<i64> }
+
+#[derive(Deserialize, Clone)]
 #[serde(default)]
 pub struct StatusJson {
     pub expanded: bool,
@@ -145,6 +152,10 @@ impl Default for Scenario {
             }),
             place: "東京".into(),
             power: None,
+            power_display: "normal".into(),
+            power_minutes: 5,
+            power_history: Vec::new(),
+            power_now_secs: 0,
             weather: Some(WeatherJson {
                 temperature: 19.1,
                 code: 2,
@@ -241,7 +252,11 @@ mod weather;
 
 impl Scenario {
     pub fn layout(&self) -> Layout {
-        Layout::parse(&self.layout).unwrap_or(Layout::Glass)
+        crate::ui::screen::effective_layout(
+            Layout::parse(&self.layout).unwrap_or(Layout::Glass),
+            PowerDisplay::parse(&self.power_display).unwrap_or(PowerDisplay::Normal),
+            if self.power.is_some() { PowerStatus::Fresh } else { PowerStatus::Disabled },
+        )
     }
 
     /// 流れる文字を組み立てる (ファームウェアの render_task と同じ `ScrollText::compose`)
@@ -270,6 +285,8 @@ impl Scenario {
     pub fn view<'a>(&'a self, extra_secs: u32, scroll_x: i32, text: &'a ScrollText) -> View<'a> {
         let s = &self.status;
         View {
+            power_display: PowerDisplay::parse(&self.power_display).unwrap_or(PowerDisplay::Normal),
+            power_trend: None,
             power: self.power.as_ref().map(|p| PowerView {
                 milliwatts: p.milliwatts,
                 status: match p.status.as_str() {

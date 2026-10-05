@@ -79,6 +79,21 @@ header.top h1 small { color: var(--muted); font-weight: 500; font-size: 14px; ma
 .lcd.classic .date { left: 49%; top: 3%; color: #a0e0ff; text-shadow: none; }
 .lcd.classic .band { top: 54%; height: 16%; color: #ffffc0; }
 .lcd-row { display: grid; grid-template-columns: minmax(0, 800px) minmax(0, 1fr); gap: 16px; align-items: end; }
+.lcd .power { position: absolute; left: 2%; top: 58%; font-size: 3cqw; color: #65ece6; background: rgba(8,12,22,.55); border-radius: 1cqw; padding: .5cqw 1.5cqw; }
+.lcd .power small { font-size: 2cqw; color: var(--soft); }
+.lcd .power-trend { display: none; position: absolute; left: 13.2%; top: 33.3%; width: 41.3%; height: 29.2%; }
+.lcd .power-range { display: none; position: absolute; left: 13.2%; top: 65%; font-size: 1.7cqw; color: var(--soft); }
+.lcd.power-focus .power { left: 1%; top: 4%; width: 56%; height: 71%; text-align: center; padding-top: 3.5cqw; font-size: 8.4cqw; border: 1px solid rgba(255,255,255,.14); }
+.lcd.power-focus .power small { position: absolute; left: 1.5cqw; top: 1cqw; }
+.lcd.power-focus .clock { left: 60.5%; top: 5%; font-size: 4.6cqw; }
+.lcd.power-focus .clock span { font-size: 2.7cqw; }
+.lcd.power-focus .date { left: 60.5%; top: 26%; font-size: 3cqw; }
+.lcd.power-focus .card { top: 41%; height: 34%; font-size: 2.7cqw; }
+.lcd.power-focus .card .place { display: none; }
+.lcd.power-focus .card br { display: initial; }
+.lcd.power-focus .card .temp { font-size: 3cqw; }
+.lcd.power-graph .power { padding-top: .3cqw; font-size: 4.6cqw; }
+.lcd.power-graph .power-trend, .lcd.power-graph .power-range { display: block; }
 .lcd-note { color: var(--muted); font-size: 13px; }
 .lcd-note strong { color: var(--soft); font-weight: 600; }
 
@@ -224,6 +239,9 @@ ul.results button span { color: var(--muted); font: 12px var(--mono); white-spac
       <div class="date" id="lcd-date">時刻同期中…</div>
       <div class="card"><span class="place" id="lcd-place">東京</span><span class="temp" id="lcd-temp">--.-°</span><br><span id="lcd-wx">天気取得中…</span></div>
       <div class="band"><span id="lcd-band">流れる文字</span></div>
+      <div class="power"><small>P110M</small> <span>343.3 W</span></div>
+      <svg class="power-trend" viewBox="0 0 165 28" aria-label="電力グラフの見本"><path d="M0 27H165 M0 1H165 M0 14H165" stroke="#657080" stroke-width=".5" fill="none"/><path d="M0 22H12V18H26V20H41V7H58V10H72V15H86V4H104V12H120V8H140V16H165" fill="none" stroke="#65ece6" stroke-width="1"/></svg>
+      <div class="power-range"><span id="lcd-power-range">5分</span> · 平均 W · 現在 →</div>
     </div>
     <p class="lcd-note">上は見本です (写真は SD の 1 枚目、時計はこの端末の時刻を<strong id="note-tz">UTC+9</strong>で表示)。<br>保存すると LCD にすぐ反映されます。再起動は要りません。</p>
   </div>
@@ -319,6 +337,21 @@ ul.results button span { color: var(--muted); font: 12px var(--mono); white-spac
               <option value="180">180度回転（デバイスを逆さに置く）</option>
             </select>
           </label>
+          <label class="field">電力表示
+            <select id="f-power_display">
+              <option value="normal">通常</option>
+              <option value="large">大きく</option>
+              <option value="graph">大きく＋グラフ</option>
+            </select>
+          </label>
+          <label class="field">グラフ期間
+            <select id="f-power_minutes">
+              <option value="1">1分</option><option value="5">5分</option>
+              <option value="30">30分</option><option value="60">1時間</option>
+              <option value="360">6時間</option><option value="1440">24時間</option>
+            </select>
+          </label>
+          <p class="hint">大きく表示すると、時計・天気は右側へ移ります。履歴は起動中に蓄積し、再起動で消えます。短い期間は5秒、6・24時間は2分の集計値です。画面の見本の電力・グラフはサンプル値です。</p>
           <label class="field">写真の切り替え間隔
             <select id="f-slide">
               <option value="0">切り替えない</option>
@@ -589,7 +622,7 @@ let files = [];      // SD の BMP [{name,size}]
 let photoState = []; // 並び [{name,size,use}]
 let photosLoaded = false;
 
-const FIELDS = ['place', 'lat', 'lon', 'tz', 'layout', 'rotate', 'slide', 'status', 'scroll', 'message', 'message_url', 'images', 'show_settings'];
+const FIELDS = ['place', 'lat', 'lon', 'tz', 'layout', 'rotate', 'power_display', 'power_minutes', 'slide', 'status', 'scroll', 'message', 'message_url', 'images', 'show_settings'];
 
 function current() {
   const radio = (n) => (document.querySelector(`input[name=${n}]:checked`) || {}).value;
@@ -601,6 +634,8 @@ function current() {
     tz: tzLabel(Number($('f-tz').value)),
     layout: radio('layout'),
     rotate: $('f-rotate').value,
+    power_display: $('f-power_display').value,
+    power_minutes: $('f-power_minutes').value,
     slide: $('f-slide').value,
     status: radio('status'),
     scroll: $('f-scroll').value,
@@ -620,6 +655,8 @@ function base() {
     tz: tzLabel(b.tz_offset_secs),
     layout: b.layout,
     rotate: String(b.rotate || 0),
+    power_display: b.power_display || 'normal',
+    power_minutes: String(b.power_minutes || 5),
     slide: String(b.slide),
     status: b.status,
     scroll: String(b.scroll),
@@ -673,6 +710,8 @@ function fillForm(s) {
   }
   ($('l-' + s.layout) || $('l-glass')).checked = true;
   $('f-rotate').value = String(s.rotate || 0);
+  $('f-power_display').value = s.power_display || 'normal';
+  $('f-power_minutes').value = String(s.power_minutes || 5);
   $('f-slide').value = String(s.slide);
   if (!$('f-slide').value) {
     const o = document.createElement('option');
@@ -703,7 +742,7 @@ function refreshUi() {
   $('c-message').classList.toggle('over', mb > 512);
   const d = diff();
   const n = Object.keys(d).length;
-  const map = { place: 'f-place', lat: 'f-lat', lon: 'f-lon', tz: 'f-tz', rotate: 'f-rotate', slide: 'f-slide', message: 'f-message', message_url: 'f-message_url' };
+  const map = { place: 'f-place', lat: 'f-lat', lon: 'f-lon', tz: 'f-tz', rotate: 'f-rotate', power_display: 'f-power_display', power_minutes: 'f-power_minutes', slide: 'f-slide', message: 'f-message', message_url: 'f-message_url' };
   for (const [k, id] of Object.entries(map)) $(id).classList.toggle('changed', k in d);
   $('save-msg').innerHTML = n ? `<b>未保存の変更 ${n} 件</b> (${Object.keys(d).map(labelOf).join('、')})` : '変更はありません';
   $('btn-save').disabled = !n;
@@ -712,6 +751,8 @@ function refreshUi() {
 }
 
 function labelOf(k) {
+  if (k === 'power_display') return '電力表示';
+  if (k === 'power_minutes') return 'グラフ期間';
   return { place: '地名', lat: '緯度', lon: '経度', tz: '時差', layout: '画面構成', rotate: '画面の向き', slide: '切り替え間隔', status: '状態表示', scroll: '速さ', message: '文字', message_url: 'URL', images: '写真の並び', show_settings: '設定 URL の表示' }[k] || k;
 }
 
@@ -1066,7 +1107,8 @@ $('crop-ok').addEventListener('click', async () => {
 function paintLcd() {
   const c = loaded ? current() : null;
   const lcd = $('lcd');
-  if (c) lcd.className = 'lcd ' + c.layout;
+  if (c) lcd.className = c.power_display === 'normal' ? 'lcd ' + c.layout : 'lcd glass power-focus' + (c.power_display === 'graph' ? ' power-graph' : '');
+  $('lcd-power-range').textContent = $('f-power_minutes').selectedOptions[0]?.textContent || '5分';
   lcd.style.transform = c && c.rotate === '180' ? 'rotate(180deg)' : '';
   const ctx = $('lcd-bg').getContext('2d');
   const first = photoState.find((p) => p.use && thumbs.get(p.name));

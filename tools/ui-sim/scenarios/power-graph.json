@@ -1,0 +1,260 @@
+{
+  "power_display": "graph",
+  "power_minutes": 5,
+  "power": {
+    "milliwatts": 343300,
+    "status": "fresh"
+  },
+  "background": "../samples/SUNSET.BMP",
+  "message": "電力の推移。中央の切れ目は欠測区間。",
+  "power_now_secs": 300,
+  "power_history": [
+    {
+      "at_secs": 0,
+      "milliwatts": 180000
+    },
+    {
+      "at_secs": 5,
+      "milliwatts": 200000
+    },
+    {
+      "at_secs": 10,
+      "milliwatts": 220000
+    },
+    {
+      "at_secs": 15,
+      "milliwatts": 240000
+    },
+    {
+      "at_secs": 20,
+      "milliwatts": 260000
+    },
+    {
+      "at_secs": 25,
+      "milliwatts": 280000
+    },
+    {
+      "at_secs": 30,
+      "milliwatts": 300000
+    },
+    {
+      "at_secs": 35,
+      "milliwatts": 320000
+    },
+    {
+      "at_secs": 40,
+      "milliwatts": 340000
+    },
+    {
+      "at_secs": 45,
+      "milliwatts": 360000
+    },
+    {
+      "at_secs": 50,
+      "milliwatts": 380000
+    },
+    {
+      "at_secs": 55,
+      "milliwatts": 400000
+    },
+    {
+      "at_secs": 60,
+      "milliwatts": 420000
+    },
+    {
+      "at_secs": 65,
+      "milliwatts": 440000
+    },
+    {
+      "at_secs": 70,
+      "milliwatts": 460000
+    },
+    {
+      "at_secs": 75,
+      "milliwatts": 480000
+    },
+    {
+      "at_secs": 80,
+      "milliwatts": 500000
+    },
+    {
+      "at_secs": 85,
+      "milliwatts": 520000
+    },
+    {
+      "at_secs": 90,
+      "milliwatts": 180000
+    },
+    {
+      "at_secs": 95,
+      "milliwatts": 200000
+    },
+    {
+      "at_secs": 100,
+      "milliwatts": 220000
+    },
+    {
+      "at_secs": 105,
+      "milliwatts": 240000
+    },
+    {
+      "at_secs": 110,
+      "milliwatts": 260000
+    },
+    {
+      "at_secs": 115,
+      "milliwatts": 280000
+    },
+    {
+      "at_secs": 120,
+      "milliwatts": null
+    },
+    {
+      "at_secs": 125,
+      "milliwatts": null
+    },
+    {
+      "at_secs": 130,
+      "milliwatts": null
+    },
+    {
+      "at_secs": 135,
+      "milliwatts": null
+    },
+    {
+      "at_secs": 140,
+      "milliwatts": null
+    },
+    {
+      "at_secs": 145,
+      "milliwatts": null
+    },
+    {
+      "at_secs": 150,
+      "milliwatts": null
+    },
+    {
+      "at_secs": 155,
+      "milliwatts": 440000
+    },
+    {
+      "at_secs": 160,
+      "milliwatts": 460000
+    },
+    {
+      "at_secs": 165,
+      "milliwatts": 480000
+    },
+    {
+      "at_secs": 170,
+      "milliwatts": 500000
+    },
+    {
+      "at_secs": 175,
+      "milliwatts": 520000
+    },
+    {
+      "at_secs": 180,
+      "milliwatts": 180000
+    },
+    {
+      "at_secs": 185,
+      "milliwatts": 200000
+    },
+    {
+      "at_secs": 190,
+      "milliwatts": 220000
+    },
+    {
+      "at_secs": 195,
+      "milliwatts": 240000
+    },
+    {
+      "at_secs": 200,
+      "milliwatts": 260000
+    },
+    {
+      "at_secs": 205,
+      "milliwatts": 280000
+    },
+    {
+      "at_secs": 210,
+      "milliwatts": 300000
+    },
+    {
+      "at_secs": 215,
+      "milliwatts": 320000
+    },
+    {
+      "at_secs": 220,
+      "milliwatts": 340000
+    },
+    {
+      "at_secs": 225,
+      "milliwatts": 360000
+    },
+    {
+      "at_secs": 230,
+      "milliwatts": 380000
+    },
+    {
+      "at_secs": 235,
+      "milliwatts": 400000
+    },
+    {
+      "at_secs": 240,
+      "milliwatts": 420000
+    },
+    {
+      "at_secs": 245,
+      "milliwatts": 440000
+    },
+    {
+      "at_secs": 250,
+      "milliwatts": 460000
+    },
+    {
+      "at_secs": 255,
+      "milliwatts": 480000
+    },
+    {
+      "at_secs": 260,
+      "milliwatts": 500000
+    },
+    {
+      "at_secs": 265,
+      "milliwatts": 520000
+    },
+    {
+      "at_secs": 270,
+      "milliwatts": 180000
+    },
+    {
+      "at_secs": 275,
+      "milliwatts": 200000
+    },
+    {
+      "at_secs": 280,
+      "milliwatts": 220000
+    },
+    {
+      "at_secs": 285,
+      "milliwatts": 240000
+    },
+    {
+      "at_secs": 290,
+      "milliwatts": 260000
+    },
+    {
+      "at_secs": 295,
+      "milliwatts": 280000
+    },
+    {
+      "at_secs": 300,
+      "milliwatts": 300000
+    }
+  ],
+  "status": {
+    "version": "v0.6.3"
+  }
+}

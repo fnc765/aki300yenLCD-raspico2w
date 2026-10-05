@@ -31,6 +31,7 @@ LCD の見本 (ui-sim、`tools/ui-sim/scenarios/settings*.json`):
 |---|---|---|
 | 地域: 都市の検索 (ブラウザが Open-Meteo の地名検索 API を直接呼ぶ。端末は通信しない)、地名、緯度、経度、UTC からの時差 | `place` `lat` `lon` `tz` | すぐ。緯度 / 経度が変わったら天気をすぐ取り直す |
 | 表示: 画面構成 (Glass / Dock / Classic)、画面の向き (通常 / 180度回転)、写真の切り替え間隔、状態 3 行の出し方、流れる文字の速さ | `layout` `rotate` `slide` `status` `scroll` | すぐ。デバイスを逆さに置く場合は「180度回転」を選ぶ。画面構成を変えたら写真を読み直す (写真の暗がりを構成ごとに焼き込むため) |
+| 電力表示 (0.6.3〜): 通常 / 大きく / 大きく＋グラフ、グラフ期間 (1分 / 5分 / 30分 / 1時間 / 6時間 / 24時間) | `power_display` `power_minutes` | すぐ。起動中の履歴は表示・期間を変えても残る。再起動で消える。画面の見本はサンプル値で、実際の履歴は LCD に表示 ([ticker.md §1.4](ticker.md#14-電力を大きく表示する推移を見る-063)) |
 | 流れる文字: 「URL から取得」(既定、5 分ごと) か「この端末で決める」 | `message_url` / `message` | すぐ。`message=` があれば取得しない |
 | 流れる文字に設定 URL とコードを入れる (0.5.1〜、既定 入れる) | `show_settings` (`1` / `0`) | すぐ (次のフレームで組み直す) |
 | 写真: SD の BMP の一覧 (サムネイル)、並べ替え、使う / 使わない、削除、追加 | `images` | すぐ (スライドショーが一覧を作り直す) |
@@ -57,10 +58,10 @@ LCD の見本 (ui-sim、`tools/ui-sim/scenarios/settings*.json`):
 |---|---|---|
 | `GET /` | 不要 | 設定ページ (gzip、`Content-Encoding: gzip`、CSP 付き) |
 | `GET /api/status` | 不要 | 端末の状態 (`version` `uptime_s` `ssid` `ip` `rssi` (常に null) `wifi` `ntp` `weather` `message_state` `ota` `ota_tone` `ident` `tbyb` `stack_used` `stack_total` `last_reset` `layout` `weather_now` `last_ota_check_s` `ota_checks` `pending`) |
-| `GET /api/settings` | 不要 | 今の設定 (`place` `lat` `lon` `tz_offset_secs` `layout` `slide` `status` `scroll` `show_settings` (0.5.1〜) `message_url` `local_message` `message` `images` `sd`) |
+| `GET /api/settings` | 不要 | 今の設定 (`place` `lat` `lon` `tz_offset_secs` `layout` `rotate` `power_display` `power_minutes` `slide` `status` `scroll` `show_settings` (0.5.1〜) `message_url` `local_message` `message` `images` `sd`) |
 | `GET /api/images` | 不要 | SD の BMP `{"files":[{"name","size"}],"order":[images= の名前],"max":16,"upload_size":115254}` |
 | `GET /img/NAME.BMP` | 不要 | SD の BMP をそのまま (`image/bmp`)。サムネイルはブラウザが縮める |
-| `POST /api/settings` | 要 | `application/x-www-form-urlencoded`。変えるキーだけ (`place` `lat` `lon` `tz` `layout` `slide` `status` `scroll` `message` `message_url` `images` `show_settings`)。`images=` / `message=` を空で送ると行を消す。値の規則は `ticker.txt` と同じ (`config::valid_value`)。4 kB まで |
+| `POST /api/settings` | 要 | `application/x-www-form-urlencoded`。変えるキーだけ (`place` `lat` `lon` `tz` `layout` `rotate` `power_display` `power_minutes` `slide` `status` `scroll` `message` `message_url` `images` `show_settings`)。`images=` / `message=` を空で送ると行を消す。値の規則は `ticker.txt` と同じ (`config::valid_value`)。4 kB まで |
 | `POST /api/images/delete` | 要 | `name=NAME.BMP`。`images=` にあれば外す |
 | `POST /api/upload?name=元の名前` | 要 | 本文は 400×96 の 24 bit BMP ちょうど 115,254 バイト (`application/octet-stream`)。応答 `{"ok":true,"name":"SD の名前"}` |
 | `POST /api/reboot` | 要 | 再起動 (buy 待ちなら 409) |
