@@ -267,6 +267,7 @@ struct Shared {
     message: String<MESSAGE_MAX>,
     message_gen: u32,
     scroll_px: u8,
+    rotate_180: bool,
     /// 画面構成と状態 3 行の出し方 (ticker.txt)
     layout: Layout,
     status_mode: StatusMode,
@@ -327,6 +328,7 @@ impl Shared {
             message: String::new(),
             message_gen: 0,
             scroll_px: 1,
+            rotate_180: false,
             layout: Layout::Glass,
             status_mode: StatusMode::Auto,
             boot_at: Instant::from_ticks(0),
@@ -644,6 +646,7 @@ async fn render_task(mut display: Display) {
                 }
             }
             let m = &*m;
+            display.set_rotate_180(m.rotate_180);
             slideshow::BG.lock(|bg| draw_screen(display.back(), &bg.borrow()[..], m, scroll_x));
             (m.power_gen, m.power.view(Instant::now().as_millis() as u32))
         });
@@ -1236,6 +1239,7 @@ impl web_server::App for WebHost<'_> {
             m.tz_offset_secs = new.tz_offset_secs;
             m.place = new.place.clone();
             m.scroll_px = new.scroll_px;
+            m.rotate_180 = new.rotate_180;
             m.layout = layout;
             m.status_mode = new.status;
             m.show_settings = new.show_settings;
@@ -2132,6 +2136,7 @@ async fn main(spawner: Spawner) {
         m.power = PowerState::new(power_status);
         m.place = config.place.clone();
         m.scroll_px = config.scroll_px;
+        m.rotate_180 = config.rotate_180;
         m.show_settings = config.show_settings;
         m.layout = layout;
         m.status_mode = config.status;
@@ -2184,6 +2189,7 @@ async fn main(spawner: Spawner) {
     slideshow::fill_default(layout);
     MODEL.lock(|cell| {
         let m = cell.borrow();
+        display.set_rotate_180(m.rotate_180);
         slideshow::BG.lock(|bg| draw_screen(display.back(), &bg.borrow()[..], &m, layout.scroll_area(false).1));
     });
     display.start(Irqs);

@@ -11,6 +11,8 @@ use crate::power::{PowerStatus, PowerView};
 pub struct Scenario {
     /// glass / dock / classic
     pub layout: String,
+    /// 出力の回転 (ticker.txt の rotate=0 / 180)。
+    pub rotate: u16,
     /// 背景の BMP (シナリオのファイルからの相対パス)。null なら既定のグラデーション
     pub background: Option<String>,
     /// GIF のスライド切り替えで次に出す BMP (null なら切り替えを描かない)
@@ -129,6 +131,7 @@ impl Default for Scenario {
     fn default() -> Self {
         Self {
             layout: "glass".into(),
+            rotate: 0,
             background: None,
             next_background: None,
             bg_level: 32,

@@ -441,11 +441,18 @@ impl Handler<DMA_IRQ_1> for FrameIrqHandler {
 pub struct Display {
     /// `start()` でペリフェラルを消費するまで保持する
     pins: Option<DisplayPins>,
+    rotate_180: bool,
 }
 
 impl Display {
     pub fn new(pins: DisplayPins) -> Self {
-        Self { pins: Some(pins) }
+        Self { pins: Some(pins), rotate_180: false }
+    }
+
+    /// デバイスを逆さに置くとき、文字と背景を含む出力全体を 180 度回転する。
+    /// 次の `start` / `present` から反映する。走査の順序と DMA の設定は変えない。
+    pub fn set_rotate_180(&mut self, rotate_180: bool) {
+        self.rotate_180 = rotate_180;
     }
 
     /// 走査を開始済みか
@@ -484,7 +491,7 @@ impl Display {
             return;
         };
         // DMA 未起動なのでフロントへの同期コピーは安全。
-        copy_back_to_front();
+        copy_back_to_front(self.rotate_180);
         start_scanout(pins, irqs);
     }
 
@@ -493,7 +500,7 @@ impl Display {
     /// 走査開始前なら即時コピーする。
     pub async fn present(&mut self) {
         if !self.is_running() {
-            copy_back_to_front();
+            copy_back_to_front(self.rotate_180);
             return;
         }
         let mut misses = 0;
@@ -504,7 +511,7 @@ impl Display {
                 if misses >= PRESENT_MAX_MISSES {
                     defmt::warn!("present: missed vblank {} times, copying mid-frame", misses);
                 }
-                copy_back_to_front();
+                copy_back_to_front(self.rotate_180);
                 return;
             }
             misses += 1;
@@ -538,7 +545,7 @@ async fn wait_frame_start() {
 /// RGB565 → 走査ワードの変換は 2 つの 256 語の表の OR (1 画素 ≈ 7 サイクル、1 行 ≈ 20〜25 µs @150 MHz)。
 /// 走査は 1 行 ≈ 147 µs なので、ブランキング中に始めれば v0.3 までの単純コピー (≈5 µs/行) と同じく
 /// 走査に追い越されない (全 96 行 ≈ 2.4 ms、ブランキング 16 行 ≈ 2.4 ms のうち先頭 12 行以内に開始)。
-fn copy_back_to_front() {
+fn copy_back_to_front(rotate_180: bool) {
     // Safety: BACK は Display の &mut self 経由でしか書かれず、この関数も
     // Display の &mut self からしか呼ばれない。FRONT を書くのはここだけで、
     // DMA は読み出しのみ。
@@ -546,11 +553,9 @@ fn copy_back_to_front() {
     let front = unsafe { &mut *addr_of_mut!(FRONT) };
     let borders = unsafe { &mut *addr_of_mut!(BORDERS) };
     for y in 0..BACK_HEIGHT {
-        let src = back.row(y);
+        let src = back.row(crate::ui::rotation::source_row(y, BACK_HEIGHT, rotate_180));
         let dst = &mut front[y * BACK_WIDTH..(y + 1) * BACK_WIDTH];
-        for (d, &c) in dst.iter_mut().zip(src) {
-            *d = scan_word(c);
-        }
+        crate::ui::rotation::copy_pixels(src, dst, rotate_180, scan_word);
         borders[y] = [dst[0], dst[BACK_WIDTH - 1]];
     }
     compiler_fence(Ordering::SeqCst);

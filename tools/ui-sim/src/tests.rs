@@ -8,6 +8,41 @@ use crate::ui::icons;
 use crate::ui::{HEIGHT, PIXELS, WIDTH};
 
 #[test]
+fn lcd_rotation_preserves_rectangular_geometry_and_pixel_conversion() {
+    let src = [1u16, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    for rotate in [false, true] {
+        let mut dst = [0u32; 12];
+        for y in 0..3 {
+            let row = crate::ui::rotation::source_row(y, 3, rotate);
+            crate::ui::rotation::copy_pixels(&src[row * 4..(row + 1) * 4], &mut dst[y * 4..(y + 1) * 4], rotate, |c| u32::from(c) * 17);
+        }
+        let expected: Vec<_> = if rotate { src.iter().rev().map(|&c| u32::from(c) * 17).collect() } else { src.iter().map(|&c| u32::from(c) * 17).collect() };
+        assert_eq!(dst.as_slice(), expected);
+    }
+}
+
+#[test]
+fn screen_rotation_includes_every_widget_and_status_layout() {
+    use crate::scenario::{Scenario, PowerJson};
+    use crate::ui::screen::Layout;
+    let mut sc = Scenario::default();
+    sc.power = Some(PowerJson { milliwatts: Some(354_300), status: "fresh".into(), age_secs: 0 });
+    let bg: Vec<_> = (0..PIXELS).map(|i| i as u16).collect();
+    for layout in [Layout::Glass, Layout::Dock, Layout::Classic] {
+        for expanded in [false, true] {
+            sc.status.expanded = expanded;
+            sc.rotate = 0;
+            let normal = crate::output::render_frame(&sc, &bg, 32, layout, 0, 0);
+            sc.rotate = 180;
+            let rotated = crate::output::render_frame(&sc, &bg, 32, layout, 0, 0);
+            assert!(normal.iter().eq(rotated.iter().rev()));
+            assert_eq!(rotated[0], normal[PIXELS - 1]);
+            assert_eq!(rotated[WIDTH - 1], normal[PIXELS - WIDTH]);
+        }
+    }
+}
+
+#[test]
 fn blend_matches_reference() {
     for &(d, s) in &[(0u16, 0xffffu16), (0x1234, 0xabcd), (0xf800, 0x07e0), (0x001f, 0xffe0)] {
         for a in 0..=32u8 {

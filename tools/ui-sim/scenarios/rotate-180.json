@@ -1,0 +1,14 @@
+{
+  "layout": "glass",
+  "rotate": 180,
+  "background": "../samples/SUNSET.BMP",
+  "message": "デバイスを逆さに置いて使用できます。",
+  "power": {"milliwatts": 343336, "status": "fresh"},
+  "status": {
+    "expanded": false,
+    "ident_head": "ticker v0.6.2",
+    "version": "v0.6.2",
+    "ota": "OTA: up to date"
+  },
+  "animation": {"duration_ms": 2400, "frame_ms": 50}
+}

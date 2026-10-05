@@ -35,6 +35,7 @@ STATE = {
         "lon": 139.7671,
         "tz_offset_secs": 32400,
         "layout": "glass",
+        "rotate": 0,
         "slide": 30,
         "status": "auto",
         "scroll": 1,
@@ -223,7 +224,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def save(self, form):
         s = STATE["settings"]
-        allowed = {"place", "lat", "lon", "tz", "layout", "slide", "status", "scroll", "message", "message_url", "images", "show_settings"}
+        allowed = {"place", "lat", "lon", "tz", "layout", "rotate", "slide", "status", "scroll", "message", "message_url", "images", "show_settings"}
         for key, values in form.items():
             if key not in allowed:
                 return self.fail(400, "知らない設定の名前です")
@@ -247,6 +248,9 @@ class Handler(BaseHTTPRequestHandler):
                     n = int(v)
                     assert n == 0 or 5 <= n <= 3600
                     s["slide"] = n
+                elif key == "rotate":
+                    assert v in ("0", "180")
+                    s["rotate"] = int(v)
                 elif key == "status":
                     assert v in ("auto", "full", "compact")
                     s["status"] = v
