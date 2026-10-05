@@ -16,7 +16,7 @@ FONT = sys.argv[1] if len(sys.argv) > 1 else "/usr/share/fonts/truetype/dejavu/D
 
 # (Rust の名前, 字の大きさ (px), 字種, 送り幅の追加 (px), 数字を等幅にするか)
 FONTS = [
-    ("CLOCK", 42, "0123456789:-", 0, True),
+    ("CLOCK", 42, "0123456789:.-", 0, True),
     ("MEDIUM", 20, "0123456789:.-°%", 0, True),
     ("SMALL", 13, "0123456789:.-°%/", 0, True),
 ]
