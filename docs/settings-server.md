@@ -54,6 +54,11 @@ LCD の見本 (ui-sim、`tools/ui-sim/scenarios/settings*.json`):
 
 すべて `http://<端末の IP>/`。応答は JSON (UTF-8)。エラーは `{"ok":false,"status":N,"error":"日本語の理由"}`。
 
+`weather_now` は気温 `temperature`、天気コード `code`、説明 `condition` と、今日の降水確率 `rain_pct` を含む。
+`rain_pct` の未取得は `null`。大型電力・グラフの見本では、LCDと同じく気温の右に表示する。
+右側の時計・日付・天気の枠は、表示中の最も広い行に合わせて自動的に幅を変える。
+アイコンと降水確率も幅に含め、詳細バー表示で隠れる天気の説明は除く。
+
 | メソッド / パス | コード | 内容 |
 |---|---|---|
 | `GET /` | 不要 | 設定ページ (gzip、`Content-Encoding: gzip`、CSP 付き) |
@@ -171,6 +176,18 @@ NODE_PATH=$(npm root -g) node tools/settings-mock/screenshots.mjs out/ 写真.jp
 `mock_server.py` は **ファームウェアと同じ `web/settings/index.html`** を gzip で返し、API を同じ形・同じ検査
 (コード、締め出し、Origin、BMP のヘッダ、8.3 の名前、値の規則) で真似る (写真は `IMAGE*.BMP` と `tools/ui-sim/samples`)。
 `screenshots.mjs` (Playwright) はデスクトップ / スマートフォン / 切り抜きの画面を PNG にする (地名検索は決まった結果を返す)。
+
+配置の回帰検証には Python の Playwright と `check_layout.py` を使う。上の mock を動かしたまま、次を実行する
+(Chromium が未インストールの Windows では `--channel msedge` を追加できる)。
+
+```sh
+python3 tools/settings-mock/check_layout.py --url http://127.0.0.1:8080/ --out out/settings-layout
+```
+
+320〜1920 px の幅で通常の3構成・大型電力・グラフ・詳細バー・180度回転を確認し、全6期間、長い日付・天気、
+0W・4桁・負値・取得待ちの固定文字の字形範囲も調べる。保存と再読込、写真の追加・並べ替え・使用切替・削除の
+キャンセル、縦横の切り抜き画面、保存帯の下に末尾が隠れないことを検証する。出力の `checks.json` と PNG を確認し、
+数値検査に通っても、文字のバランスとボタンの位置を画像で確認する。API の変更は mock のメモリ内だけに行う。
 
 ページは `build.rs` が gzip にして埋め込む (`OUT_DIR/settings.html.gz`)。HTTP の解釈、フォームの復号、`ticker.txt` の書き換え、
 値の検査、アクセスコードと締め出し、Host / Origin の確認、BMP のヘッダ、8.3 の名前、JSON は `tools/ticker-tests` の `web_tests`。

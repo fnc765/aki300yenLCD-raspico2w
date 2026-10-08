@@ -138,7 +138,7 @@ class Handler(BaseHTTPRequestHandler):
                 "stack_total": 36380,
                 "last_reset": "power-on / reset pin",
                 "layout": STATE["settings"]["layout"],
-                "weather_now": {"temperature": 19.1, "code": 2, "condition": "晴れ時々くもり"},
+                "weather_now": {"temperature": 19.1, "code": 2, "condition": "晴れ時々くもり", "rain_pct": 40},
                 "last_ota_check_s": 19,
                 "ota_checks": 193,
                 "pending": False,

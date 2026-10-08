@@ -1214,6 +1214,11 @@ impl web_server::App for WebHost<'_> {
                     j.float(w.temperature, 1);
                     j.field_int("code", i64::from(w.code));
                     j.field_str("condition", w.condition_ja());
+                    j.key("rain_pct");
+                    match w.rain_pct {
+                        Some(p) => j.int(i64::from(p)),
+                        None => j.null(),
+                    }
                     j.end_object();
                 }
                 None => j.null(),
