@@ -27,6 +27,7 @@
   --font: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Noto Sans Mono", monospace;
   --r: 14px;
+  --savebar-height: 96px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -39,7 +40,7 @@ body {
     radial-gradient(900px 600px at 100% 0%, rgba(96, 224, 232, .12), transparent 55%),
     linear-gradient(180deg, #0c1224 0%, var(--ground) 70%);
   background-attachment: fixed;
-  padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(96px + env(safe-area-inset-bottom, 0px));
+  padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + var(--savebar-height));
 }
 .wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 16px; }
 header.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -53,22 +54,26 @@ header.top h1 small { color: var(--muted); font-weight: 500; font-size: 14px; ma
 .spacer { flex: 1; }
 
 /* LCD の見本 */
-.lcd { position: relative; width: 100%; max-width: 800px; aspect-ratio: 400 / 96; border-radius: 10px; overflow: hidden; background: #111a2e; border: 1px solid var(--edge-strong); box-shadow: 0 10px 40px rgba(0, 0, 0, .5), inset 0 0 0 4px #05070c; container-type: inline-size; }
+.lcd { position: relative; width: 100%; max-width: 800px; aspect-ratio: 400 / 96; border-radius: 10px; overflow: hidden; background: #111a2e; border: 1px solid var(--edge-strong); box-shadow: 0 10px 40px rgba(0, 0, 0, .5), inset 0 0 0 4px #05070c; container-type: inline-size; line-height: 1; }
 .lcd canvas.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .lcd .scrim { position: absolute; inset: 0; background: linear-gradient(120deg, rgba(0, 0, 0, .45), transparent 58%); }
 .lcd .clock { position: absolute; left: 2%; top: 3%; font-weight: 600; font-size: 8.4cqw; line-height: 1; letter-spacing: -.01em; text-shadow: 0 .25cqw .5cqw rgba(0, 0, 0, .6); font-variant-numeric: tabular-nums; }
 .lcd .clock span { font-size: 4.4cqw; color: var(--soft); }
-.lcd .date { position: absolute; left: 2.5%; top: 41%; font-size: 3.5cqw; text-shadow: 0 .2cqw .4cqw rgba(0, 0, 0, .7); }
+.lcd .date { position: absolute; left: 2.5%; top: 41%; font-size: 3.5cqw; white-space: nowrap; text-shadow: 0 .2cqw .4cqw rgba(0, 0, 0, .7); }
 .lcd .card { position: absolute; left: 58.5%; top: 4%; width: 40.5%; height: 56%; border-radius: 1cqw; background: rgba(8, 12, 22, .55); border: 1px solid rgba(255, 255, 255, .14); backdrop-filter: blur(3px); padding: 1cqw 1.5cqw; font-size: 3.3cqw; }
 .lcd .card .place { position: absolute; right: 1.5cqw; top: 1cqw; color: var(--soft); }
 .lcd .card .temp { color: var(--accent); font-size: 4.6cqw; font-weight: 600; }
+.lcd .weather-values { display: contents; }
+.lcd .weather-temp { display: contents; }
+.lcd .weather-icon { display: none; }
+.lcd .rain { display: none; }
 .lcd .band { position: absolute; left: 1%; right: 1%; top: 77%; height: 20%; border-radius: 1cqw; background: rgba(8, 12, 22, .55); border: 1px solid rgba(255, 255, 255, .14); font-size: 3.4cqw; display: flex; align-items: center; padding: 0 1.5cqw; gap: 2cqw; white-space: nowrap; overflow: hidden; }
 .lcd .band b { color: var(--accent); font-weight: 600; }
 .lcd .card { line-height: 1.3; }
 .lcd.dock .card { left: .75%; right: .75%; top: 54%; width: auto; height: 43%; display: flex; align-items: flex-start; gap: 2.5cqw; padding-top: 1.2cqw; }
 .lcd.dock .card br { display: none; }
 .lcd.dock .card .place { position: static; order: 3; color: var(--muted); }
-.lcd.dock .date { left: 50%; top: 17%; }
+.lcd.dock .date { left: 50%; top: 20.8%; }
 .lcd.dock .band { top: auto; bottom: 4%; height: 20%; left: 1.5%; right: 1.5%; background: none; border: none; backdrop-filter: none; }
 .lcd.classic .scrim { background: rgba(0, 0, 0, .55); }
 .lcd.classic .card, .lcd.classic .band { background: none; border: none; backdrop-filter: none; }
@@ -76,34 +81,69 @@ header.top h1 small { color: var(--muted); font-weight: 500; font-size: 14px; ma
 .lcd.classic .card br { display: none; }
 .lcd.classic .card .place { position: static; order: -1; color: var(--accent); }
 .lcd.classic .card .temp { font-size: 3.4cqw; font-weight: 400; }
-.lcd.classic .date { left: 49%; top: 3%; color: #a0e0ff; text-shadow: none; }
+.lcd.classic .date { left: 71.5%; top: 3%; color: #a0e0ff; text-shadow: none; }
 .lcd.classic .band { top: 54%; height: 16%; color: #ffffc0; }
-.lcd-row { display: grid; grid-template-columns: minmax(0, 800px) minmax(0, 1fr); gap: 16px; align-items: end; }
-.lcd .power { position: absolute; left: 2%; top: 58%; font-size: 3cqw; color: #65ece6; background: rgba(8,12,22,.55); border-radius: 1cqw; padding: .5cqw 1.5cqw; }
+.lcd-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 264px); gap: 16px; align-items: center; }
+.lcd .power { position: absolute; left: 2%; top: 58.3%; display: flex; align-items: center; gap: 1.5cqw; font-size: 3cqw; color: #65ece6; background: rgba(8,12,22,.55); border-radius: 1cqw; padding: .25cqw 1.5cqw; white-space: nowrap; }
 .lcd .power small { font-size: 2cqw; color: var(--soft); }
-.lcd .power-trend { display: none; position: absolute; left: 13.2%; top: 33.3%; width: 41.3%; height: 29.2%; }
-.lcd .power-range { display: none; position: absolute; left: 13.2%; top: 65%; font-size: 1.7cqw; color: var(--soft); }
-.lcd.power-focus .power { left: 1%; top: 4%; width: 56%; height: 71%; text-align: center; padding-top: 3.5cqw; font-size: 8.4cqw; border: 1px solid rgba(255,255,255,.14); }
-.lcd.power-focus .power small { position: absolute; left: 1.5cqw; top: 1.25cqw; }
-.lcd.power-focus .clock { left: 60.5%; top: 8.3%; font-size: 4.6cqw; }
+.lcd .power-unit { margin-left: 1cqw; font-size: 2.5cqw; }
+.lcd.dock .power { top: 37.5%; }
+.lcd.classic .power { left: 49%; top: 2%; font-size: 1.5cqw; gap: 1cqw; padding: .5cqw 1cqw; }
+.lcd.classic .power small { font-size: 1.25cqw; }
+.lcd.classic .power-unit, .lcd.details.glass:not(.power-focus) .power-unit { font-size: 1.5cqw; }
+.lcd .power-trend { display: none; position: absolute; left: 13.25%; top: 35.4%; width: 19.25%; height: 28.1%; }
+.lcd .power-range { display: none; position: absolute; left: 13.25%; right: 67.5%; top: 65.625%; font-size: 1.75cqw; color: var(--soft); justify-content: space-between; }
+.lcd .power-axis { display: none; position: absolute; left: 2.5%; font: 1.75cqw/1 var(--mono); color: var(--muted); }
+.lcd .power-axis.high { top: 35.4%; } .lcd .power-axis.low { top: 56.25%; }
+.lcd .info-panel { display: contents; }
+.lcd.power-focus .power { left: 1%; top: 4.2%; width: 62.5%; height: 17cqw; display: block; padding: 0; font-size: 8.4cqw; border: 1px solid rgba(255,255,255,.14); }
+.lcd.power-focus .power small { position: absolute; left: 1.75cqw; top: 1.25cqw; }
+.lcd.power-focus .power-value { position: absolute; left: 1.5cqw; right: 1.5cqw; top: 3.75cqw; text-align: right; }
+.lcd.power-focus .info-panel { display: flex; flex-direction: column; align-items: flex-end; gap: .25cqw; position: absolute; right: 1%; top: 4.2%; width: max-content; height: 17cqw; padding: 1cqw 1.5cqw .25cqw; border-radius: 1cqw; background: rgba(8,12,22,.55); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.lcd.power-focus .info-panel > * { flex-shrink: 0; }
+.lcd.power-focus .clock { position: static; font-size: 4.25cqw; white-space: nowrap; }
 .lcd.power-focus .clock span { font-size: 2.7cqw; }
-.lcd.power-focus .date { left: 60.5%; top: 27.1%; font-size: 3cqw; }
-.lcd.power-focus .card { top: 41%; height: 34%; font-size: 2.7cqw; }
+.lcd.power-focus .date { position: static; font-size: 3.5cqw; }
+.lcd.power-focus .card { position: static; width: max-content; height: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 0; padding: 0; background: none; border: none; backdrop-filter: none; font-size: 3.5cqw; line-height: 1; white-space: nowrap; }
 .lcd.power-focus .card .place { display: none; }
-.lcd.power-focus .card br { display: initial; }
-.lcd.power-focus .card .temp { font-size: 3cqw; }
-.lcd.power-graph .power { padding-top: 1cqw; font-size: 4.6cqw; }
-.lcd.power-graph .power small { top: 2cqw; }
-.lcd.power-graph .power-trend, .lcd.power-graph .power-range { display: block; }
-.lcd-note { color: var(--muted); font-size: 13px; }
+.lcd.power-focus .card br { display: none; }
+.lcd.power-focus .card .temp { font-size: 2.8cqw; }
+.lcd.power-focus .weather-values { display: flex; align-items: center; gap: 1.5cqw; }
+.lcd.power-focus .weather-temp { display: flex; align-items: center; gap: 1.25cqw; }
+.lcd.power-focus .weather-icon { display: block; width: 3.75cqw; height: 3.75cqw; flex: none; }
+.lcd.power-focus .rain { display: inline-flex; align-items: center; gap: .75cqw; padding: .25cqw 1.25cqw; border-radius: 2cqw; background: rgba(101,236,230,.22); color: #65ece6; font: 2.8cqw/1 var(--mono); }
+.lcd.power-focus .rain::before { content: ''; width: 1.25cqw; height: 2cqw; background: currentColor; clip-path: polygon(50% 0, 100% 65%, 90% 85%, 50% 100%, 10% 85%, 0 65%); }
+.lcd.power-graph .power { width: 34%; font-size: 4.25cqw; }
+.lcd.power-graph .power-number { font-weight: 600; }
+.lcd.power-graph .power-value { top: .75cqw; }
+.lcd.power-graph .power small { top: 5cqw; }
+.lcd.power-graph .power-trend, .lcd.power-graph .power-axis { display: block; }
+.lcd.power-graph .power-range { display: flex; }
+.lcd .status-detail { display: none; }
+.lcd.details .band { top: 63.5%; height: 35.4%; padding-top: .75cqw; align-items: flex-start; }
+.lcd.details #lcd-band { display: none; }
+.lcd.details .status-detail { display: grid; gap: .75cqw; font: 2cqw/1 var(--mono); }
+.lcd.details.glass:not(.power-focus) .power { left: 32%; top: 40.6%; font-size: 1.5cqw; gap: 1cqw; }
+.lcd.details.glass:not(.power-focus) .power small { font-size: 1.25cqw; }
+/* cqw keeps the 68/55px LCD tile heights despite the preview's outer border. */
+.lcd.details.power-focus .power, .lcd.details .info-panel { height: 13.75cqw; }
+.lcd.details.power-focus .power { font-size: 4.6cqw; }
+.lcd.details.power-focus .card { margin-top: .5cqw; }
+.lcd.details.power-focus #lcd-wx { display: none; }
+.lcd.details.power-graph .power { font-size: 4.25cqw; }
+.lcd.details.power-graph .power-trend { height: 14.6%; }
+.lcd.details.power-graph .power-axis.low { top: 42.708%; }
+.lcd.details.power-graph .power-range { top: 52.083%; }
+.lcd.details.dock:not(.power-focus) .card { display: none; }
+.lcd-note { min-width: 0; margin: 0; color: var(--muted); font-size: 13px; }
 .lcd-note strong { color: var(--soft); font-weight: 600; }
 
 /* カード */
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .col { display: grid; gap: 16px; min-width: 0; }
-section.panel { background: var(--glass); border: 1px solid var(--edge); border-radius: var(--r); padding: 18px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); min-width: 0; }
-section.panel > h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; text-wrap: balance; }
-section.panel > h2 .key { font: 12px var(--mono); color: var(--muted); font-weight: 400; }
+section.panel { background: var(--glass); border: 1px solid var(--edge); border-radius: var(--r); padding: 18px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); min-width: 0; container-type: inline-size; }
+section.panel > h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; }
+section.panel > h2 .key { min-width: 0; overflow-wrap: anywhere; font: 12px var(--mono); color: var(--muted); font-weight: 400; }
 .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
 .hint code, code { font-family: var(--mono); font-size: .92em; color: var(--soft); }
 
@@ -162,33 +202,34 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 /* 都市の検索 */
 .search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 ul.results { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
-ul.results button { width: 100%; text-align: left; font-weight: 500; display: flex; justify-content: space-between; gap: 10px; background: rgba(0, 0, 0, .2); }
-ul.results button span { color: var(--muted); font: 12px var(--mono); white-space: nowrap; }
+ul.results button { width: 100%; text-align: left; font-weight: 500; display: grid; gap: 4px; background: rgba(0, 0, 0, .2); overflow-wrap: anywhere; }
+ul.results button span { color: var(--muted); font: 12px var(--mono); }
 
 /* 写真 */
 .photos { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.photo { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px; border-radius: 11px; border: 1px solid var(--edge); background: rgba(0, 0, 0, .2); }
+.photo { display: grid; grid-template-columns: clamp(96px, 30vw, 150px) minmax(0, 1fr); gap: 8px 12px; align-items: center; padding: 8px; border-radius: 11px; border: 1px solid var(--edge); background: rgba(0, 0, 0, .2); }
 .photo.off { opacity: .55; }
 .photo.dragging { outline: 2px dashed var(--accent); }
-.photo canvas { width: 150px; height: 36px; border-radius: 4px; background: #1d2438; display: block; }
+.photo canvas { width: 100%; height: auto; aspect-ratio: 400 / 96; border-radius: 4px; background: #1d2438; display: block; }
 .photo .meta { min-width: 0; display: grid; gap: 2px; }
 .photo .meta .n { font: 600 14px var(--mono); overflow-wrap: anywhere; }
 .photo .meta .s { font-size: 12px; color: var(--muted); }
-.photo .ctl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.photo .ctl { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.photo .ctl .toggle { margin-right: auto; }
 .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--soft); cursor: pointer; white-space: nowrap; }
 .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
 .empty { color: var(--muted); font-size: 14px; padding: 14px; border: 1px dashed var(--edge-strong); border-radius: 11px; text-align: center; }
 
 /* 保存の帯 */
 .savebar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--glass-strong); border-top: 1px solid var(--edge-strong); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 10; }
-.savebar .in { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.savebar .msg { flex: 1; min-width: 12em; font-size: 14px; color: var(--soft); }
+.savebar .in { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px 10px; }
+.savebar .msg { min-width: 0; font-size: 14px; color: var(--soft); overflow-wrap: anywhere; }
 .savebar .msg b { color: var(--accent); }
 
 /* ダイアログ */
 .modal { position: fixed; inset: 0; background: rgba(2, 4, 10, .72); display: grid; place-items: center; padding: 16px; z-index: 20; }
 #dlg-code, #dlg-confirm { z-index: 25; }
-.dialog { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: #0d1322; border: 1px solid var(--edge-strong); border-radius: 16px; padding: 20px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, .6); }
+.dialog { width: min(560px, 100%); min-width: 0; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; background: #0d1322; border: 1px solid var(--edge-strong); border-radius: 16px; padding: 20px; display: grid; gap: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, .6); }
 .dialog.wide { width: min(880px, 100%); }
 .dialog h3 { margin: 0; font-size: 17px; }
 .codebox { font: 600 28px var(--mono); letter-spacing: .35em; text-align: center; padding: 10px; }
@@ -200,7 +241,7 @@ ul.results button span { color: var(--muted); font: 12px var(--mono); white-spac
 .crop-out { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
 .crop-out canvas { width: 200px; height: 48px; border-radius: 4px; image-rendering: pixelated; border: 1px solid var(--edge); }
 
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: #0d1322; border: 1px solid var(--edge-strong); border-radius: 12px; padding: 10px 16px; font-size: 14px; z-index: 30; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(12px + var(--savebar-height)); background: #0d1322; border: 1px solid var(--edge-strong); border-radius: 12px; padding: 10px 16px; font-size: 14px; z-index: 30; width: max-content; max-width: calc(100% - 32px); overflow-wrap: anywhere; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
 .toast.error { border-color: var(--red); }
 .toast.ok { border-color: var(--green); }
 
@@ -209,13 +250,17 @@ ul.results button span { color: var(--muted); font: 12px var(--mono); white-spac
   .lcd-row { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 520px) {
+  section.panel { padding: 14px; }
+  .savebar .msg { grid-column: 1 / -1; }
+  #btn-revert { grid-column: 2; }
+  #code-form .actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  #code-form .actions .spacer { display: none; }
+  #code-form button[type=submit] { grid-column: 1 / -1; }
+}
+@container (max-width: 440px) {
   .choices { grid-template-columns: minmax(0, 1fr); }
   .choice { grid-template-columns: 110px minmax(0, 1fr); align-items: center; }
   .choice .mini { grid-row: span 2; }
-  .photo { grid-template-columns: 110px minmax(0, 1fr); }
-  .photo canvas { width: 110px; height: 26px; }
-  .photo .ctl { grid-column: 1 / -1; justify-content: space-between; }
-  section.panel { padding: 14px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .toast { animation: rise .2s ease-out; }
@@ -232,17 +277,35 @@ ul.results button span { color: var(--muted); font: 12px var(--mono); white-spac
     <span class="chip"><span class="dot" id="dot-conn"></span><span id="conn-text">接続中…</span></span>
   </header>
 
+  <!-- Pixel icons from src/ui/icons.rs; include their full width when sizing the tile. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+      <symbol id="lcd-icon-sun" viewBox="0 0 15 15"><path fill="#ffd648" d="M7 0h1v1h-1zM7 1h1v1h-1zM2 2h1v1h-1zM12 2h1v1h-1zM3 3h1v1h-1zM11 3h1v1h-1zM6 4h3v1h-3zM5 5h5v1h-5zM4 6h7v1h-7zM0 7h2v1h-2zM4 7h7v1h-7zM13 7h2v1h-2zM4 8h7v1h-7zM5 9h5v1h-5zM6 10h3v1h-3zM3 11h1v1h-1zM11 11h1v1h-1zM2 12h1v1h-1zM12 12h1v1h-1zM7 13h1v1h-1zM7 14h1v1h-1z"/><path fill="#ff9628" d="M6 3h3v1h-3zM5 4h1v1h-1zM9 4h1v1h-1zM4 5h1v1h-1zM10 5h1v1h-1zM3 6h1v1h-1zM11 6h1v1h-1zM3 7h1v1h-1zM11 7h1v1h-1zM3 8h1v1h-1zM11 8h1v1h-1zM4 9h1v1h-1zM10 9h1v1h-1zM5 10h1v1h-1zM9 10h1v1h-1zM6 11h3v1h-3z"/></symbol>
+      <symbol id="lcd-icon-moon" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M5 1h1v1h-1zM9 1h1v1h-1zM4 2h1v1h-1zM8 2h1v1h-1zM3 3h1v1h-1zM7 3h1v1h-1zM2 4h1v1h-1zM7 4h1v1h-1zM2 5h1v1h-1zM6 5h1v1h-1zM1 6h1v1h-1zM6 6h1v1h-1zM1 7h1v1h-1zM6 7h1v1h-1zM1 8h1v1h-1zM7 8h1v1h-1zM2 9h1v1h-1zM8 9h1v1h-1zM2 10h1v1h-1zM9 10h1v1h-1zM13 10h1v1h-1zM3 11h1v1h-1zM13 11h1v1h-1zM4 12h1v1h-1zM12 12h1v1h-1zM5 13h2v1h-2zM11 13h1v1h-1zM7 14h4v1h-4z"/><path fill="#fceeb0" d="M6 1h3v1h-3zM5 2h3v1h-3zM4 3h3v1h-3zM3 4h4v1h-4zM3 5h3v1h-3zM2 6h4v1h-4zM2 7h4v1h-4zM2 8h5v1h-5zM3 9h5v1h-5zM4 10h5v1h-5zM5 11h8v1h-8zM7 12h5v1h-5z"/><path fill="#d6c482" d="M3 10h1v1h-1zM4 11h1v1h-1zM5 12h2v1h-2zM7 13h4v1h-4z"/></symbol>
+      <symbol id="lcd-icon-partly-sun" viewBox="0 0 15 15"><path fill="#ffd648" d="M9 0h1v1h-1zM4 1h1v1h-1zM9 1h1v1h-1zM14 1h1v1h-1zM5 2h1v1h-1zM12 2h1v1h-1zM7 3h3v1h-3zM6 4h5v1h-5zM13 4h2v1h-2zM7 5h5v1h-5zM8 6h4v1h-4zM14 7h1v1h-1zM12 8h1v1h-1z"/><path fill="#ff9628" d="M7 2h3v1h-3zM6 3h1v1h-1zM10 3h1v1h-1zM5 4h1v1h-1zM11 4h1v1h-1zM12 5h1v1h-1zM12 6h1v1h-1zM9 7h3v1h-3z"/><path fill="#000000" opacity=".4375" d="M4 5h3v1h-3zM3 6h1v1h-1zM7 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM1 8h1v1h-1zM9 8h2v1h-2zM0 9h1v1h-1zM11 9h1v1h-1zM0 10h1v1h-1zM12 10h1v1h-1zM0 11h1v1h-1zM13 11h1v1h-1zM0 12h1v1h-1zM13 12h1v1h-1zM1 13h1v1h-1zM12 13h1v1h-1zM2 14h10v1h-10z"/><path fill="#f4f7fc" d="M4 6h3v1h-3zM3 7h5v1h-5zM2 8h7v1h-7zM1 9h10v1h-10zM1 10h11v1h-11zM2 11h11v1h-11zM3 12h10v1h-10z"/><path fill="#c4cede" d="M1 11h1v1h-1zM1 12h2v1h-2zM2 13h10v1h-10z"/></symbol>
+      <symbol id="lcd-icon-partly-moon" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M8 1h1v1h-1zM12 1h1v1h-1zM7 2h1v1h-1zM11 2h1v1h-1zM6 3h1v1h-1zM10 3h1v1h-1zM6 4h1v1h-1zM10 4h1v1h-1zM4 5h3v1h-3zM11 5h1v1h-1zM3 6h1v1h-1zM7 6h1v1h-1zM13 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM12 7h1v1h-1zM1 8h1v1h-1zM9 8h3v1h-3zM0 9h1v1h-1zM11 9h1v1h-1zM0 10h1v1h-1zM12 10h1v1h-1zM0 11h1v1h-1zM13 11h1v1h-1zM0 12h1v1h-1zM13 12h1v1h-1zM1 13h1v1h-1zM12 13h1v1h-1zM2 14h10v1h-10z"/><path fill="#fceeb0" d="M9 1h3v1h-3zM8 2h3v1h-3zM7 3h3v1h-3zM7 4h3v1h-3zM7 5h4v1h-4zM8 6h5v1h-5zM9 7h3v1h-3z"/><path fill="#f4f7fc" d="M4 6h3v1h-3zM3 7h5v1h-5zM2 8h7v1h-7zM1 9h10v1h-10zM1 10h11v1h-11zM2 11h11v1h-11zM3 12h10v1h-10z"/><path fill="#c4cede" d="M1 11h1v1h-1zM1 12h2v1h-2zM2 13h10v1h-10z"/></symbol>
+      <symbol id="lcd-icon-cloud" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M6 3h4v1h-4zM5 4h1v1h-1zM10 4h1v1h-1zM2 5h3v1h-3zM11 5h1v1h-1zM1 6h1v1h-1zM12 6h1v1h-1zM1 7h1v1h-1zM13 7h1v1h-1zM0 8h1v1h-1zM14 8h1v1h-1zM0 9h1v1h-1zM14 9h1v1h-1zM0 10h1v1h-1zM14 10h1v1h-1zM0 11h1v1h-1zM14 11h1v1h-1zM1 12h1v1h-1zM13 12h1v1h-1zM2 13h11v1h-11z"/><path fill="#f4f7fc" d="M6 4h4v1h-4zM5 5h6v1h-6zM2 6h10v1h-10zM2 7h11v1h-11zM1 8h13v1h-13zM1 9h13v1h-13zM2 10h11v1h-11zM4 11h7v1h-7z"/><path fill="#c4cede" d="M1 10h1v1h-1zM13 10h1v1h-1zM1 11h3v1h-3zM11 11h3v1h-3zM2 12h11v1h-11z"/></symbol>
+      <symbol id="lcd-icon-fog" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M6 2h4v1h-4zM5 3h1v1h-1zM10 3h1v1h-1zM2 4h3v1h-3zM11 4h1v1h-1zM1 5h1v1h-1zM12 5h1v1h-1zM0 6h1v1h-1zM13 6h1v1h-1zM1 7h12v1h-12z"/><path fill="#c4cede" d="M6 3h4v1h-4zM5 4h6v1h-6zM2 5h10v1h-10zM1 6h12v1h-12zM1 9h12v1h-12zM3 11h12v1h-12zM1 13h11v1h-11z"/></symbol>
+      <symbol id="lcd-icon-drizzle" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M6 0h4v1h-4zM5 1h1v1h-1zM10 1h1v1h-1zM2 2h3v1h-3zM11 2h1v1h-1zM1 3h1v1h-1zM12 3h1v1h-1zM0 4h1v1h-1zM13 4h1v1h-1zM0 5h1v1h-1zM13 5h1v1h-1zM1 6h1v1h-1zM12 6h1v1h-1zM2 7h10v1h-10z"/><path fill="#c4cede" d="M6 1h4v1h-4zM5 2h6v1h-6zM2 3h10v1h-10zM1 4h12v1h-12zM2 5h10v1h-10z"/><path fill="#8c96a8" d="M1 5h1v1h-1zM12 5h1v1h-1zM2 6h10v1h-10z"/><path fill="#58aaff" d="M3 9h1v1h-1zM7 9h1v1h-1zM11 9h1v1h-1zM1 11h1v1h-1zM5 11h1v1h-1zM9 11h1v1h-1zM3 13h1v1h-1zM7 13h1v1h-1zM11 13h1v1h-1z"/></symbol>
+      <symbol id="lcd-icon-rain" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M6 0h4v1h-4zM5 1h1v1h-1zM10 1h1v1h-1zM2 2h3v1h-3zM11 2h1v1h-1zM1 3h1v1h-1zM12 3h1v1h-1zM0 4h1v1h-1zM13 4h1v1h-1zM0 5h1v1h-1zM13 5h1v1h-1zM1 6h1v1h-1zM12 6h1v1h-1zM2 7h10v1h-10z"/><path fill="#8c96a8" d="M6 1h4v1h-4zM5 2h6v1h-6zM2 3h10v1h-10zM1 4h12v1h-12zM2 5h10v1h-10z"/><path fill="#60687a" d="M1 5h1v1h-1zM12 5h1v1h-1zM2 6h10v1h-10z"/><path fill="#58aaff" d="M3 8h1v1h-1zM7 8h1v1h-1zM11 8h1v1h-1zM2 9h1v1h-1zM6 9h1v1h-1zM10 9h1v1h-1zM2 10h1v1h-1zM6 10h1v1h-1zM10 10h1v1h-1zM1 11h1v1h-1zM5 11h1v1h-1zM9 11h1v1h-1zM1 12h1v1h-1zM5 12h1v1h-1zM9 12h1v1h-1zM0 13h1v1h-1zM4 13h1v1h-1zM8 13h1v1h-1z"/></symbol>
+      <symbol id="lcd-icon-snow" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M6 0h4v1h-4zM5 1h1v1h-1zM10 1h1v1h-1zM2 2h3v1h-3zM11 2h1v1h-1zM1 3h1v1h-1zM12 3h1v1h-1zM0 4h1v1h-1zM13 4h1v1h-1zM0 5h1v1h-1zM13 5h1v1h-1zM1 6h1v1h-1zM12 6h1v1h-1zM2 7h10v1h-10z"/><path fill="#c4cede" d="M6 1h4v1h-4zM5 2h6v1h-6zM2 3h10v1h-10zM1 4h12v1h-12zM2 5h10v1h-10z"/><path fill="#8c96a8" d="M1 5h1v1h-1zM12 5h1v1h-1zM2 6h10v1h-10z"/><path fill="#c8e8ff" d="M2 9h1v1h-1zM8 9h1v1h-1zM1 10h3v1h-3zM7 10h3v1h-3zM12 10h1v1h-1zM2 11h1v1h-1zM8 11h1v1h-1zM11 11h3v1h-3zM5 12h1v1h-1zM12 12h1v1h-1zM4 13h3v1h-3zM5 14h1v1h-1z"/></symbol>
+      <symbol id="lcd-icon-thunder" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M6 0h4v1h-4zM5 1h1v1h-1zM10 1h1v1h-1zM2 2h3v1h-3zM11 2h1v1h-1zM1 3h1v1h-1zM12 3h1v1h-1zM0 4h1v1h-1zM13 4h1v1h-1zM0 5h1v1h-1zM13 5h1v1h-1zM1 6h1v1h-1zM12 6h1v1h-1zM2 7h4v1h-4zM8 7h4v1h-4z"/><path fill="#8c96a8" d="M6 1h4v1h-4zM5 2h6v1h-6zM2 3h10v1h-10zM1 4h12v1h-12zM2 5h10v1h-10z"/><path fill="#60687a" d="M1 5h1v1h-1zM12 5h1v1h-1zM2 6h5v1h-5zM9 6h3v1h-3z"/><path fill="#ffe840" d="M7 6h2v1h-2zM6 7h2v1h-2zM5 8h2v1h-2zM4 9h5v1h-5zM7 10h2v1h-2zM6 11h2v1h-2zM5 12h2v1h-2zM4 13h1v1h-1z"/><path fill="#58aaff" d="M1 8h1v1h-1zM11 8h1v1h-1zM1 9h1v1h-1zM11 9h1v1h-1zM0 10h1v1h-1zM10 10h1v1h-1zM0 11h1v1h-1zM10 11h1v1h-1z"/></symbol>
+      <symbol id="lcd-icon-unknown" viewBox="0 0 15 15"><path fill="#000000" opacity=".4375" d="M4 2h6v1h-6zM3 3h1v1h-1zM10 3h1v1h-1zM2 4h1v1h-1zM5 4h4v1h-4zM11 4h1v1h-1zM2 5h3v1h-3zM9 5h1v1h-1zM11 5h1v1h-1zM9 6h1v1h-1zM11 6h1v1h-1zM7 7h2v1h-2zM11 7h1v1h-1zM6 8h1v1h-1zM10 8h1v1h-1zM6 9h1v1h-1zM9 9h1v1h-1zM6 10h4v1h-4zM6 12h1v1h-1zM9 12h1v1h-1zM6 13h1v1h-1zM9 13h1v1h-1zM6 14h4v1h-4z"/><path fill="#c4cede" d="M4 3h6v1h-6zM3 4h2v1h-2zM9 4h2v1h-2zM10 5h1v1h-1zM10 6h1v1h-1zM9 7h2v1h-2zM7 8h3v1h-3zM7 9h2v1h-2zM7 12h2v1h-2zM7 13h2v1h-2z"/></symbol>
+  </defs></svg>
+
   <div class="lcd-row">
     <div class="lcd glass" id="lcd" aria-label="LCD の見本 (400×96)">
       <canvas class="bg" id="lcd-bg" width="400" height="96"></canvas>
       <div class="scrim"></div>
-      <div class="clock" id="lcd-clock">--:--<span>:--</span></div>
-      <div class="date" id="lcd-date">時刻同期中…</div>
-      <div class="card"><span class="place" id="lcd-place">東京</span><span class="temp" id="lcd-temp">--.-°</span><br><span id="lcd-wx">天気取得中…</span></div>
-      <div class="band"><span id="lcd-band">流れる文字</span></div>
-      <div class="power"><small>P110M</small> <span>343.3 W</span></div>
-      <svg class="power-trend" viewBox="0 0 165 28" aria-label="電力グラフの見本"><path d="M0 27H165 M0 1H165 M0 14H165" stroke="#657080" stroke-width=".5" fill="none"/><path d="M0 22H12V18H26V20H41V7H58V10H72V15H86V4H104V12H120V8H140V16H165" fill="none" stroke="#65ece6" stroke-width="1"/></svg>
-      <div class="power-range"><span id="lcd-power-range">5分</span> · 平均 W · 現在 →</div>
+      <div class="info-panel">
+        <div class="clock" id="lcd-clock">--:--<span>:--</span></div>
+        <div class="date" id="lcd-date">時刻同期中…</div>
+        <div class="card"><span class="place" id="lcd-place">東京</span><span class="weather-values"><span class="weather-temp"><svg class="weather-icon" viewBox="0 0 15 15" aria-hidden="true"><use id="lcd-weather-icon" href="#lcd-icon-unknown"/></svg><span class="temp" id="lcd-temp">--.-°</span></span><span class="rain" id="lcd-rain" title="今日の降水確率">--%</span></span><br><span id="lcd-wx">天気取得中…</span></div>
+      </div>
+      <div class="band"><span id="lcd-band">流れる文字</span><div class="status-detail"><span id="lcd-status-jobs">Wi-Fi | NTP | WX | MSG</span><span id="lcd-status-ident">ticker</span><span id="lcd-status-ota">OTA</span></div></div>
+      <div class="power"><small>P110M</small><span class="power-value"><span class="power-number">343.3</span><span class="power-unit">W</span></span></div>
+      <svg class="power-trend" viewBox="0 0 165 28" preserveAspectRatio="none" aria-label="電力グラフの見本"><path d="M0 27H165 M0 1H165 M0 14H165" stroke="#657080" stroke-width=".5" fill="none"/><path d="M0 22H12V18H26V20H41V7H58V10H72V15H86V4H104V12H120V8H140V16H165" fill="none" stroke="#65ece6" stroke-width="1"/></svg>
+      <div class="power-axis high">520.0</div><div class="power-axis low">0.0</div>
+      <div class="power-range"><span id="lcd-power-range">5分</span><span>現在 →</span></div>
     </div>
     <p class="lcd-note">上は見本です (写真は SD の 1 枚目、時計はこの端末の時刻を<strong id="note-tz">UTC+9</strong>で表示)。<br>保存すると LCD にすぐ反映されます。再起動は要りません。</p>
   </div>
@@ -439,7 +502,7 @@ ul.results button span { color: var(--muted); font: 12px var(--mono); white-spac
     <label class="field">拡大<span class="range-row"><input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="1"><output id="crop-zoom-o">1.00×</output></span></label>
     <div class="crop-out">
       <canvas id="crop-out" width="400" height="96"></canvas>
-      <span>ドラッグで位置、拡大はスライダー / ホイール / 2 本指。<br><label class="toggle"><input type="checkbox" id="crop-guide-on"> 時計・天気・帯の位置を重ねる</label></span>
+      <span>ドラッグで位置、拡大はスライダー / ホイール / 2 本指。<br><label class="toggle"><input type="checkbox" id="crop-guide-on"> 表示の枠を重ねる</label></span>
     </div>
     <label class="field">SD に置く名前 (8.3 形式、同じ名前があれば端末が付け直します)
       <input type="text" id="crop-name" maxlength="12" spellcheck="false" style="font-family:var(--mono)">
@@ -460,6 +523,11 @@ const $ = (id) => document.getElementById(id);
 const enc = new TextEncoder();
 const bytes = (s) => enc.encode(s).length;
 const MAX_FILES = 16, UPLOAD_SIZE = 115254;
+
+// 折り返した保存帯の高さも確保し、最後の項目や通知を帯の下に隠さない。
+new ResizeObserver(([entry]) => {
+  document.documentElement.style.setProperty('--savebar-height', `${entry.target.getBoundingClientRect().height}px`);
+}).observe(document.querySelector('.savebar'));
 
 // ---------- 通信: 端末は 1 本ずつしか受けないので、要求は必ず順番に送る ----------
 let chain = Promise.resolve();
@@ -990,7 +1058,23 @@ function openCrop(img, name) {
   $('crop-progress').textContent = '';
   $('crop-ok').disabled = false;
   $('dlg-crop').hidden = false;
+  updateCropGuides();
   drawCrop();
+}
+
+/** 選んだ表示構成の枠を、回転前の写真の座標へ写す。 */
+function updateCropGuides() {
+  const lcd = $('lcd'), root = lcd.getBoundingClientRect();
+  const focus = lcd.classList.contains('power-focus');
+  const areas = focus ? ['.power', '.info-panel', '.band'] : ['.clock', '.card', '.band'];
+  const rotated = lcd.style.transform.includes('180');
+  $('crop-guides').querySelectorAll('i').forEach((guide, i) => {
+    const el = lcd.querySelector(areas[i]), r = el.getBoundingClientRect();
+    guide.hidden = !el.getClientRects().length;
+    const x = rotated ? root.right - r.right : r.left - root.left;
+    const y = rotated ? root.bottom - r.bottom : r.top - root.top;
+    guide.style.cssText = `left:${x / root.width * 100}%;top:${y / root.height * 100}%;width:${r.width / root.width * 100}%;height:${r.height / root.height * 100}%`;
+  });
 }
 
 /** 出力 (400×96) の座標で、画像をどこに描くか */
@@ -1108,7 +1192,7 @@ $('crop-ok').addEventListener('click', async () => {
 function paintLcd() {
   const c = loaded ? current() : null;
   const lcd = $('lcd');
-  if (c) lcd.className = c.power_display === 'normal' ? 'lcd ' + c.layout : 'lcd glass power-focus' + (c.power_display === 'graph' ? ' power-graph' : '');
+  if (c) lcd.className = (c.power_display === 'normal' ? 'lcd ' + c.layout : 'lcd glass power-focus' + (c.power_display === 'graph' ? ' power-graph' : '')) + (c.status === 'full' ? ' details' : '');
   $('lcd-power-range').textContent = $('f-power_minutes').selectedOptions[0]?.textContent || '5分';
   lcd.style.transform = c && c.rotate === '180' ? 'rotate(180deg)' : '';
   const ctx = $('lcd-bg').getContext('2d');
@@ -1128,6 +1212,23 @@ function paintLcd() {
   let text = $('m-local').checked ? (c.message || '(文字なし)') : (lastStatus && lastStatus.message_state ? `URL の文字 (${lastStatus.message_state})` : 'URL の文字');
   if (c.show_settings === '1') text += `\u3000◆\u3000設定 http://${(lastStatus && lastStatus.ip) || location.hostname}/  コード ••••••\u3000◆`;
   $('lcd-band').textContent = text;
+  if (lastStatus) {
+    $('lcd-status-jobs').textContent = `Wi-Fi ${lastStatus.ip || '--'} | NTP ${lastStatus.ntp} | WX ${lastStatus.weather} | MSG ${lastStatus.message_state}`;
+    $('lcd-status-ident').textContent = lastStatus.ident;
+    $('lcd-status-ota').textContent = 'OTA: ' + lastStatus.ota;
+  }
+}
+
+function paintWeatherIcon(code, hour) {
+  const night = hour < 6 || hour >= 18;
+  const icon = code === 0 ? (night ? 'moon' : 'sun')
+    : code === 1 || code === 2 ? (night ? 'partly-moon' : 'partly-sun')
+    : code === 3 ? 'cloud' : code === 45 || code === 48 ? 'fog'
+    : code >= 51 && code <= 57 ? 'drizzle'
+    : (code >= 61 && code <= 67) || (code >= 80 && code <= 82) ? 'rain'
+    : (code >= 71 && code <= 77) || code === 85 || code === 86 ? 'snow'
+    : code >= 95 && code <= 99 ? 'thunder' : 'unknown';
+  $('lcd-weather-icon').setAttribute('href', '#lcd-icon-' + icon);
 }
 
 function tick() {
@@ -1137,6 +1238,7 @@ function tick() {
   const hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0'), ss = String(d.getUTCSeconds()).padStart(2, '0');
   $('lcd-clock').innerHTML = `${hh}:${mm}<span>:${ss}</span>`;
   $('lcd-date').textContent = `${d.getUTCMonth() + 1}月${d.getUTCDate()}日(${'日月火水木金土'[d.getUTCDay()]})`;
+  paintWeatherIcon(lastStatus?.weather_now?.code, d.getUTCHours());
 }
 setInterval(tick, 1000);
 
@@ -1173,7 +1275,9 @@ async function loadStatus() {
     if (s.weather_now) {
       $('lcd-temp').textContent = s.weather_now.temperature.toFixed(1) + '°';
       $('lcd-wx').textContent = s.weather_now.condition;
+      $('lcd-rain').textContent = Number.isFinite(s.weather_now.rain_pct) ? s.weather_now.rain_pct + '%' : '--%';
     }
+    tick();
     $('btn-reboot').disabled = s.pending;
     $('btn-reboot').title = s.pending ? '更新の確定 (TBYB) を待つ間は再起動できません' : '';
     paintLcd();

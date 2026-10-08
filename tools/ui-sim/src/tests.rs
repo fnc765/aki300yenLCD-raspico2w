@@ -229,7 +229,7 @@ fn icons_are_rectangular() {
 /// Audit requested text extents before the canvas clips them, including extreme meter values.
 /// The moving ticker intentionally enters/leaves its viewport; fixed widgets must fit completely.
 #[test]
-fn power_widgets_fit_without_clipping_overlap_or_off_center_values() {
+fn power_widgets_fit_without_clipping_overlap_or_misaligned_values() {
     use crate::power::{self, PowerHistory, PowerTrend};
     use crate::scenario::{HistoryJson, PowerJson, Scenario};
     use crate::ui::canvas::Canvas;
@@ -281,7 +281,7 @@ fn power_widgets_fit_without_clipping_overlap_or_off_center_values() {
                             }
                         }
                         // Axis labels must also stay clear of the plot starting at x=53.
-                        if mode == "graph" && b.x0 == 10 && b.y0 >= 32 && b.x1 > 49 {
+                        if mode == "graph" && b.x0 == 10 && b.y0 >= 34 && b.x1 > 49 {
                             issues.insert(format!("axis label overlaps plot: {}", r.label));
                         }
                     }
@@ -289,13 +289,168 @@ fn power_widgets_fit_without_clipping_overlap_or_off_center_values() {
                     let number = number.as_ref().map(|n| n.trim_end_matches(" W")).unwrap_or("--");
                     let r = regions.iter().find(|r| r.label.as_str() == number && r.bounds.y0 < 30).unwrap();
                     let unit = regions.iter().find(|r| r.label.as_str() == "W").unwrap();
-                    // Full number plus unit centered in the left panel [4,228), to one pixel.
-                    assert!(((r.bounds.x0 - 4) - (228 - unit.bounds.x1)).abs() <= 1);
+                    // Both focused modes keep the full value and unit six pixels from the tile edge.
+                    assert_eq!(unit.bounds.x1, if mode == "graph" { 134 } else { 248 });
+                    assert_eq!(r.bounds.x1 + 4, unit.bounds.x0);
+                    if mode == "graph" {
+                        let clock = regions.iter().find(|r| r.bounds.x0 >= 266 && r.label.as_str() == "23:59").unwrap();
+                        let device = regions.iter().find(|r| r.label.as_str() == "P110M").unwrap();
+                        let axis = regions.iter().find(|r| r.bounds.x0 == 10 && r.bounds.y0 >= 34).unwrap();
+                        assert_eq!(r.bounds.y1, clock.bounds.y1, "power value and clock must share a row");
+                        assert!(device.bounds.y0 >= r.bounds.y1.max(unit.bounds.y1) + 2);
+                        assert!(axis.bounds.y0 >= device.bounds.y1 + 2);
+                    }
                 }
             }
         }
     }
     assert!(issues.is_empty(), "{}", issues.into_iter().collect::<Vec<_>>().join("\n"));
+}
+
+#[test]
+fn power_focus_right_aligns_clock_date_and_weather_without_clipping() {
+    use crate::scenario::{PowerJson, Scenario};
+    use crate::ui::canvas::Canvas;
+    use crate::ui::screen::{self, Layout};
+    let bg = vec![0; PIXELS];
+    for mode in ["large", "graph"] {
+        for expanded in [false, true] {
+            for synced in [false, true] {
+                for weather_code in [None, Some(2), Some(56), Some(82), Some(99)] {
+                    for rain in [None, Some(0), Some(100)] {
+                        let mut sc = Scenario::default();
+                        sc.power_display = mode.into();
+                        sc.power = Some(PowerJson { milliwatts: Some(343300), status: "fresh".into(), age_secs: 0 });
+                        sc.status.expanded = expanded;
+                        sc.clock.as_mut().unwrap().month = 12;
+                        sc.clock.as_mut().unwrap().day = 31;
+                        if !synced { sc.clock = None; }
+                        if let Some(code) = weather_code {
+                            sc.weather.as_mut().unwrap().code = code;
+                            sc.weather.as_mut().unwrap().temperature = -99.9;
+                            sc.weather.as_mut().unwrap().rain_pct = rain;
+                        } else { sc.weather = None; }
+                        let text = sc.scroll_text();
+                        let view = sc.view(0, 0, &text);
+                        let mut pixels = vec![0; PIXELS];
+                        let mut c = Canvas::new(&mut pixels);
+                        c.audit_layout();
+                        screen::render(&mut c, &bg, 32, &view, Layout::Glass);
+                        let info: Vec<_> = c.draw_regions().iter().filter(|r| r.bounds.x0 > 254 && r.bounds.y0 < 61).collect();
+                        let content_left = info.iter().map(|r| r.bounds.x0).min().unwrap();
+                        for r in &info {
+                            assert_eq!(r.clip.x0, content_left, "unused space before the widest row");
+                            assert!(r.bounds.x0 >= r.clip.x0 && r.bounds.x1 <= 390, "{} {:?}", r.label, r.bounds);
+                            assert!(r.bounds.y1 <= r.clip.y1, "{} {:?}", r.label, r.bounds);
+                        }
+                        let date = info.iter().find(|r| r.bounds.y0 == 26).unwrap();
+                        assert_eq!(date.bounds.x1, 390);
+                        let clock_right = info.iter().filter(|r| r.bounds.y0 < 26).map(|r| r.bounds.x1).max().unwrap();
+                        assert_eq!(clock_right, 390);
+                        if weather_code.is_some() {
+                            let temp = info.iter().find(|r| r.label.as_str() == "-99.9°").unwrap();
+                            let rain_label = rain.map(|p| format!("{p}%")).unwrap_or_else(|| "--%".into());
+                            let pct = info.iter().find(|r| r.label.as_str() == rain_label).unwrap();
+                            assert_eq!(pct.bounds.x1, 385); // Five pixels of chip padding at the right.
+                            assert!(temp.bounds.x1 + 6 < pct.bounds.x0);
+                            for (i, a) in info.iter().enumerate() {
+                                for b in &info[..i] {
+                                    assert!(a.bounds.x0.max(b.bounds.x0) >= a.bounds.x1.min(b.bounds.x1)
+                                        || a.bounds.y0.max(b.bounds.y0) >= a.bounds.y1.min(b.bounds.y1),
+                                        "{} overlaps {}", a.label, b.label);
+                                }
+                            }
+                            if !expanded {
+                                let condition = info.iter().find(|r| r.bounds.y0 == 56).unwrap();
+                                assert_eq!(condition.bounds.x1, 390);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn graph_tiles_leave_the_central_120_pixels_as_background() {
+    use crate::scenario::{PowerJson, Scenario};
+    use crate::ui::canvas::Canvas;
+    use crate::ui::screen::{self, Layout};
+    let bg = vec![0x7bef; PIXELS];
+    for expanded in [false, true] {
+        let mut sc = Scenario::default();
+        sc.power_display = "graph".into();
+        sc.power = Some(PowerJson { milliwatts: Some(343300), status: "fresh".into(), age_secs: 0 });
+        sc.status.expanded = expanded;
+        let text = sc.scroll_text();
+        let view = sc.view(0, 0, &text);
+        let mut pixels = vec![0; PIXELS];
+        screen::render(&mut Canvas::new(&mut pixels), &bg, 32, &view, Layout::Glass);
+        for y in 0..if expanded { 61 } else { 74 } {
+            for x in 140..260 {
+                assert_eq!(pixels[y * WIDTH + x], bg[y * WIDTH + x], "central overlay at {x},{y}");
+            }
+        }
+        // The graph keeps its width; the right tile can shrink, leaving more background visible.
+        assert_ne!(pixels[40 * WIDTH + 139], bg[40 * WIDTH + 139]);
+        assert_ne!(pixels[40 * WIDTH + 395], bg[40 * WIDTH + 395]);
+    }
+}
+
+#[test]
+fn power_info_tile_follows_the_widest_visible_row_with_equal_padding() {
+    use crate::scenario::{PowerJson, Scenario};
+    use crate::ui::canvas::Canvas;
+    use crate::ui::screen::{self, Layout};
+    let bg = vec![0x7bef; PIXELS];
+    for mode in ["large", "graph"] {
+        for synced in [false, true] {
+            for weather in [None, Some((3, 21.4, Some(40))), Some((82, 0.0, Some(0))), Some((82, -99.9, Some(100)))] {
+                let mut left_edges = Vec::new();
+                for expanded in [false, true] {
+                    let mut sc = Scenario::default();
+                    sc.power_display = mode.into();
+                    sc.power = Some(PowerJson { milliwatts: Some(343300), status: "fresh".into(), age_secs: 0 });
+                    sc.status.expanded = expanded;
+                    if !synced { sc.clock = None; }
+                    if let Some((code, temperature, rain_pct)) = weather {
+                        let w = sc.weather.as_mut().unwrap();
+                        w.code = code;
+                        w.temperature = temperature;
+                        w.rain_pct = rain_pct;
+                    } else { sc.weather = None; }
+                    let text = sc.scroll_text();
+                    let view = sc.view(0, 0, &text);
+                    let mut pixels = vec![0; PIXELS];
+                    let mut c = Canvas::new(&mut pixels);
+                    c.audit_layout();
+                    screen::render(&mut c, &bg, 32, &view, Layout::Glass);
+                    let rows: Vec<_> = c.draw_regions().iter().filter(|r| r.bounds.x0 > 254 && r.bounds.y0 < 61).collect();
+                    let left = rows.iter().map(|r| r.bounds.x0).min().unwrap();
+                    assert!(rows.iter().all(|r| r.clip.x0 == left && r.bounds.x0 >= left && r.bounds.x1 <= 390));
+                    left_edges.push(left);
+                    if !expanded && weather == Some((82, 0.0, Some(0))) {
+                        // The long condition, rather than the narrower icon/temperature/rain row, sets the width.
+                        assert_eq!(rows.iter().find(|r| r.label.as_str() == "激しいにわか雨").unwrap().bounds.x0, left);
+                    }
+                    drop(c);
+                    let panel_left = left as usize - 6;
+                    for x in 254..panel_left {
+                        assert_eq!(pixels[40 * WIDTH + x], bg[40 * WIDTH + x], "padding outside the tile at {x}");
+                    }
+                    assert_ne!(pixels[40 * WIDTH + panel_left], bg[40 * WIDTH + panel_left]);
+                    assert_eq!(pixels[40 * WIDTH + panel_left], pixels[40 * WIDTH + 395]);
+                    assert_eq!(pixels[40 * WIDTH + 396], bg[40 * WIDTH + 396]);
+                }
+                if weather == Some((82, 0.0, Some(0))) {
+                    assert!(left_edges[1] > left_edges[0], "hidden condition must not keep the tile wide");
+                } else {
+                    assert_eq!(left_edges[0], left_edges[1]);
+                }
+            }
+        }
+    }
 }
 
 #[test]

@@ -221,65 +221,97 @@ pub fn effective_layout(layout: Layout, display: PowerDisplay, status: PowerStat
     if display != PowerDisplay::Normal && status != PowerStatus::Disabled { Layout::Glass } else { layout }
 }
 
+const POWER_PANEL_X: i32 = 4;
+const POWER_PANEL_W: i32 = 250;
+const POWER_GRAPH_W: i32 = 136;
+const POWER_INFO_RIGHT: i32 = 390;
+
 fn render_power_focus(c: &mut Canvas, view: &View) {
     let graph = view.power_display == PowerDisplay::Graph;
     let height = if view.status.expanded { 55 } else { 68 };
-    c.panel(4, 4, 224, height, &GLASS_PANEL);
-    c.set_clip(Clip::new(8, 6, 216, height - 3));
-    let header_y = if graph { 12 } else { 9 };
+    let panel_w = if graph { POWER_GRAPH_W } else { POWER_PANEL_W };
+    let value_right = POWER_PANEL_X + panel_w - 6;
+    c.panel(POWER_PANEL_X, 4, panel_w, height, &GLASS_PANEL);
+    c.set_clip(Clip::new(8, 6, panel_w - 8, height - 3));
+    let header_y = if graph { 25 } else { 9 };
     c.tiny("P110M", 11, header_y, palette::SOFT);
     let color = if view.power.status == PowerStatus::Fresh { palette::AQUA } else { palette::MUTED };
     let value = view.power.milliwatts.map(power::watts);
     let number = value.as_ref().map(|v| v.trim_end_matches(" W")).unwrap_or("--");
-    let font = if graph || view.status.expanded || CLOCK.text_width(number) > 202 { &MEDIUM } else { &CLOCK };
-    // Keep the graph's centered value clear of the small device/status labels.
-    let number_limit = if graph { 138 } else { 202 };
+    let font = if graph || view.status.expanded || CLOCK.text_width(number) > panel_w - 22 { &MEDIUM } else { &CLOCK };
+    // The graph value shares the clock's top row; metadata and plot have their own rows.
+    let number_limit = panel_w - 22;
     let font = if font.text_width(number) > number_limit { &SMALL } else { font };
-    let width = font.text_width(number) + 10;
-    let nx = 4 + (224 - width) / 2;
-    let ny = if graph { 8 } else { 19 };
-    let end = c.aa_text(font, number, nx, ny, color);
-    c.small("W", end + 4, ny + font.baseline as i32 - 8, color);
+    if font.text_width(number) > number_limit {
+        // Even the full signed i64 readout fits; never clip significant digits.
+        let ny = if graph { 16 } else { 25 };
+        let end = c.tiny(number, value_right - number.len() as i32 * 5 - 10, ny, color);
+        c.small("W", end + 4, ny - 3, color);
+    } else {
+        let nx = value_right - font.text_width(number) - 10;
+        let ny = if graph { 23 - i32::from(font.height) } else { 19 };
+        let end = c.aa_text(font, number, nx, ny, color);
+        c.small("W", end + 4, ny + i32::from(font.baseline) - 10, color);
+    }
     let label = match view.power.status {
         PowerStatus::Fresh => "", PowerStatus::Stale => "old", PowerStatus::Waiting => "wait",
         PowerStatus::Unavailable => "n/a", PowerStatus::Unsupported => "no meter",
         PowerStatus::ConfigError => "config", PowerStatus::Disabled => "",
     };
-    c.tiny(label, 224 - label.len() as i32 * 5, header_y, color);
+    c.tiny(label, POWER_PANEL_X + panel_w - 4 - label.len() as i32 * 5, header_y, color);
     c.reset_clip();
     if graph && let Some(trend) = view.power_trend {
         draw_power_trend(c, trend, height);
     }
-    // Compact clock, date and weather keep the other information visible beside the larger meter.
-    c.panel(234, 4, 162, height, &GLASS_PANEL);
-    c.set_clip(Clip::new(240, 6, 150, height - 3));
+    // Keep the right edge fixed, with six pixels of padding around the widest visible row.
     let mut time: String<16> = String::new();
     if let Some(t) = view.clock { let _ = write!(time, "{:02}:{:02}", t.hour, t.minute); }
     else { let _ = time.push_str("--:--"); }
-    let end = c.aa_text(&MEDIUM, &time, 242, 8, palette::WHITE);
+    let seconds_width = if view.clock.is_some() { 2 + SMALL.text_width(":00") } else { 0 };
+    let date = date_text(view.clock);
+    let mut content_w = (MEDIUM.text_width(&time) + seconds_width).max(shinonome::text_width(&date) as i32);
+    let mut temperature: String<16> = String::new();
+    let rain = rain_text(view.weather.and_then(|w| w.rain_pct));
+    let rain_w = 18 + SMALL.text_width(&rain);
+    if let Some(w) = view.weather {
+        fmt_temp(&mut temperature, Some(w.temperature));
+        let _ = temperature.push('°');
+        let icon_w = icons::weather_icon(w.code, is_night(view.clock)).width();
+        content_w = content_w.max(icon_w + 5 + SMALL.text_width(&temperature) + 6 + rain_w);
+        if !view.status.expanded { content_w = content_w.max(shinonome::text_width(w.condition) as i32); }
+    }
+    c.panel(POWER_INFO_RIGHT - content_w - 6, 4, content_w + 12, height, &GLASS_PANEL);
+    c.set_clip(Clip::new(POWER_INFO_RIGHT - content_w, 6, content_w, height - 3));
+    let time_x = POWER_INFO_RIGHT - MEDIUM.text_width(&time) - seconds_width;
+    let end = c.aa_text(&MEDIUM, &time, time_x, 8, palette::WHITE);
     if let Some(t) = view.clock {
         time.clear();
         let _ = write!(time, ":{:02}", t.second);
         c.aa_text(&SMALL, &time, end + 2,
             8 + i32::from(MEDIUM.baseline) - i32::from(SMALL.baseline), palette::SOFT);
     }
-    c.jp(&date_text(view.clock), 242, 26, palette::OFF_WHITE);
+    c.jp(&date, POWER_INFO_RIGHT - shinonome::text_width(&date) as i32, 26, palette::OFF_WHITE);
     if let Some(w) = view.weather {
         let y = if view.status.expanded { 43 } else { 41 };
-        c.icon(icons::weather_icon(w.code, is_night(view.clock)), 241, y);
-        let mut text: String<16> = String::new();
-        fmt_temp(&mut text, Some(w.temperature));
-        let _ = text.push('°');
-        c.aa_text(&SMALL, &text, 261, y + 1, palette::ACCENT);
-        if !view.status.expanded { c.jp(w.condition, 242, 56, palette::OFF_WHITE); }
+        let rain_x = POWER_INFO_RIGHT - rain_w;
+        let tx = rain_x - 6 - SMALL.text_width(&temperature);
+        let icon = icons::weather_icon(w.code, is_night(view.clock));
+        c.icon(icon, tx - icon.width() - 5, y);
+        c.aa_text(&SMALL, &temperature, tx, y + 1, palette::ACCENT);
+        c.pill(rain_x, y, rain_w, 13, palette::AQUA, 7);
+        c.icon_tinted(&icons::DROP, rain_x + 5, y + 2, palette::AQUA);
+        c.aa_text(&SMALL, &rain, rain_x + 13, y + 2, palette::AQUA);
+        if !view.status.expanded {
+            c.jp(w.condition, POWER_INFO_RIGHT - shinonome::text_width(w.condition) as i32, 56, palette::OFF_WHITE);
+        }
     }
     c.reset_clip();
     draw_glass_band(c, view);
 }
 
 fn draw_power_trend(c: &mut Canvas, trend: &PowerTrend, height: i32) {
-    let (x, y, w, h) = (53, 32, 165, height - 40);
-    c.set_clip(Clip::new(8, 30, 214, height - 27));
+    let (x, y, w, h) = (53, 34, POWER_PANEL_X + POWER_GRAPH_W - 10 - 53, height - 41);
+    c.set_clip(Clip::new(8, 34, POWER_GRAPH_W - 10, height - 31));
     c.fill_rect(x, y + h - 1, w, 1, palette::FAINT);
     c.blend_rect(x, y, w, 1, palette::WHITE, 5);
     // The empty-state label occupies the middle; avoid a grid line through its glyphs.
@@ -303,7 +335,7 @@ fn draw_power_trend(c: &mut Canvas, trend: &PowerTrend, height: i32) {
         c.put(px, py, palette::AQUA);
         previous = Some((px, py, trend.complete[i]));
     }
-    if !trend.has_data { c.tiny("collecting...", x + 28, y + (h - 7) / 2, palette::MUTED); }
+    if !trend.has_data { c.tiny("collecting...", x + (w - 65) / 2, y + (h - 7) / 2, palette::MUTED); }
     c.tiny(power::range_label(trend.minutes), x, y + h + 2, palette::SOFT);
     c.tiny("now", x + w - 15, y + h + 2, palette::SOFT);
     c.reset_clip();
@@ -587,6 +619,15 @@ fn render_glass(c: &mut Canvas, view: &View) {
     draw_glass_band(c, view);
 }
 
+fn rain_text(rain_pct: Option<u8>) -> String<8> {
+    let mut text = String::new();
+    match rain_pct {
+        Some(p) => { let _ = write!(text, "{}%", p); }
+        None => { let _ = text.push_str("--%"); }
+    }
+    text
+}
+
 fn draw_glass_band(c: &mut Canvas, view: &View) {
     // --- 下: 3 行の状態 (展開時) または 流れる文字の帯 + 小さな状態 ---
     if view.status.expanded {
@@ -665,15 +706,7 @@ fn forecast_width(w: &WeatherView) -> i32 {
     text.clear();
     fmt_temp(&mut text, w.min);
     width += 7 + SMALL.text_width(&text) + 6;
-    text.clear();
-    match w.rain_pct {
-        Some(p) => {
-            let _ = write!(text, "{}%", p);
-        }
-        None => {
-            let _ = text.push_str("--%");
-        }
-    }
+    let text = rain_text(w.rain_pct);
     width + 5 + 5 + 3 + SMALL.text_width(&text) + 5
 }
 
