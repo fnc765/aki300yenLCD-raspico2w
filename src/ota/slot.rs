@@ -181,6 +181,11 @@ impl<'f> SlotWriter<'f> {
         self.sectors_written
     }
 
+    /// RAM に取り置いた先頭セクタ (`finish()` の後、`commit_first_sector()` の前に IMAGE_DEF を検査する)
+    pub fn first_sector(&self) -> &[u8] {
+        &self.bufs.first[..self.first_len]
+    }
+
     /// 対象区画の先頭セクタを消去して無効化する
     pub fn begin(&mut self) -> Result<(), OtaError> {
         self.erase_sector(0)

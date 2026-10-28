@@ -141,7 +141,7 @@ USB で入れた版では出ないので、OTA 更新が実際に反映された
 | `OTA: 0.2.1 downloaded, verifying (sha256 + readback)...` (黄) | 先頭セクタ書き込みと読み戻し検証 |
 | `OTA: 0.2.1 verified -> reboot into slot B in 2s (TBYB)` (緑) | 直後に FLASH_UPDATE 再起動 |
 | `OTA: 0.2.1 in slot B was rolled back; retry boot in 590s` (赤) | 前回の TBYB 起動で buy されなかった (§5)。残り秒は最初にそう判定した時刻から数える (60 s ごとの確認で延びない) |
-| `OTA: TLS failed, retry in 120s` (赤) | 失敗。理由 (`DNS failed` / `network error` / `TLS failed` / `bad HTTP response` / `HTTP 5xx` / `bad manifest.json` / `bad image size` / `size mismatch` / `sha256 mismatch` / `flash readback mismatch` / `flash error` / `timeout`) とバックオフ後の再試行時刻 |
+| `OTA: TLS failed, retry in 120s` (赤) | 失敗。理由 (`DNS failed` / `network error` / `TLS failed` / `bad HTTP response` / `HTTP 5xx` / `bad manifest.json` / `bin not allowed` / `bad image size` / `size mismatch` / `sha256 mismatch` / `no IMAGE_DEF` / `not RP2350 exe` / `image not TBYB` / `image has no version` / `image version mismatch` (1.0.1〜、`src/ota/image.rs`) / `flash readback mismatch` / `flash error` / `timeout`) とバックオフ後の再試行時刻 |
 
 ## 5. 失敗時の挙動
 

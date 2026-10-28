@@ -10,6 +10,7 @@
 
 pub mod app;
 pub mod http;
+pub mod image;
 pub mod manifest;
 pub mod slot;
 
@@ -21,6 +22,13 @@ use heapless::String;
 pub const REPO: &str = "fnc765/aki300yenLCD-raspico2w";
 /// Release アセット名
 pub const MANIFEST_NAME: &str = "manifest.json";
+/// manifest の `bin` として受け付ける Release アセット名 (1.0.1〜)。
+///
+/// Release には全 bin の `.bin` / `.sha256` が付くので、名前を自由にすると manifest の書き換えだけで
+/// OTA を持たない bin (`layer*.bin`、`sd_bmp_viewer.bin`) を入れられる。OTA の経路 (早期ウォッチドッグ、
+/// 生存確認、回復モード) を持つ `ticker` だけを許す。`wifi_ota` を再び配るときは SKILL.md §2.2 の条件を
+/// 満たしてからここに足す。
+pub const OTA_BIN_NAMES: &[&str] = &["ticker.bin"];
 /// GitHub の署名付きリダイレクト先 URL (release-assets.githubusercontent.com は JWT 付きで 1 kB を超える)
 pub const URL_MAX: usize = 2048;
 
@@ -59,12 +67,16 @@ pub enum OtaError {
     LocationTooLong,
     /// manifest.json の JSON / 版数 / sha256 が解釈できない
     Manifest,
+    /// manifest の `bin` が [`OTA_BIN_NAMES`] に無い (1.0.1〜)
+    BinNotAllowed,
     /// manifest の size が 0 か区画より大きい
     BadSize,
     /// 受信バイト数が manifest の size と違う
     SizeMismatch,
     /// 受信データの SHA-256 が manifest と違う
     ShaMismatch,
+    /// 受信したイメージの先頭セクタが TBYB の RP2350 実行イメージでない、または版数が manifest と違う (1.0.1〜)
+    Image(image::ImageError),
     /// 書き込み後の読み戻し SHA-256 が manifest と違う
     ReadbackMismatch,
     /// フラッシュ消去 / 書き込みエラー
@@ -92,14 +104,23 @@ impl OtaError {
             OtaError::TooManyRedirects => "too many redirects",
             OtaError::LocationTooLong => "redirect URL too long",
             OtaError::Manifest => "bad manifest.json",
+            OtaError::BinNotAllowed => "bin not allowed",
             OtaError::BadSize => "bad image size",
             OtaError::SizeMismatch => "size mismatch",
             OtaError::ShaMismatch => "sha256 mismatch",
+            OtaError::Image(e) => e.label(),
             OtaError::ReadbackMismatch => "flash readback mismatch",
             OtaError::Flash => "flash error",
             OtaError::NoPartitionTable => "no partition table",
             OtaError::NoTarget => "no target slot",
             OtaError::Timeout => "timeout",
         }
+    }
+}
+
+// `image` はホスト (tools/ticker-tests) でも使うので defmt に依存しない。ログ用の表示だけここで付ける。
+impl defmt::Format for image::ImageError {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(f, "{}", self.label());
     }
 }

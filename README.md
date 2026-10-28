@@ -141,8 +141,9 @@ docs/               設計・手順・実機で得た知見 (下記リンク)
 3. 書き込み先は自分が起動している区画の他方。まず先頭セクタ (IMAGE_DEF) を消して無効化。
 4. manifest の `bin` (v0.3.0〜 `ticker.bin`、v0.2.x は `wifi_ota.bin`) を 4 kB ずつ受信しながらセクタ消去 →
    256 B ページ書き込み。同時に SHA-256 を計算。名前は manifest に従うので、bin の種類の切り替えも OTA でできる。
-5. サイズと SHA-256 が manifest と一致したら先頭セクタを書き、**0x1C000000 (アドレス変換もキャッシュも通さない
-   XIP 窓)** から全域を読み戻してもう一度 SHA-256 を照合。
+5. サイズと SHA-256 が manifest と一致し、先頭セクタの IMAGE_DEF が TBYB の RP2350 実行イメージで版数が manifest と
+   一致する (1.0.1〜 `src/ota/image.rs`。manifest の `bin` も `ticker.bin` だけ) なら先頭セクタを書き、
+   **0x1C000000 (アドレス変換もキャッシュも通さない XIP 窓)** から全域を読み戻してもう一度 SHA-256 を照合。
 6. `reboot(FLASH_UPDATE, 対象区画)` → 新版が TBYB で起動。
 7. 新版 (buy 待ち) は次が全部揃ってから 25 s 健全に動いたときだけ `explicit_buy` する (0.4.2〜 `boot_policy::BuyGate`):
    Wi-Fi join + DHCP、OTA の manifest 確認が TLS + HTTP を最後まで通った (manifest を解釈できた / 確定した HTTP ステータス)、

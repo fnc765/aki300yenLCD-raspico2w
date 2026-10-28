@@ -32,6 +32,13 @@ if [ "$size" -eq 0 ]; then
     echo "error: $bin is empty" >&2
     exit 1
 fi
+# 1.0.1〜: 実機は manifest の "bin" が ota::OTA_BIN_NAMES (ticker.bin) で、IMAGE_DEF が TBYB、版数が manifest と
+# 一致する bin しか入れない (src/ota/image.rs)。同じ検査をここでして、条件を満たさない bin を manifest に載せない。
+if [ "$name" != "ticker.bin" ]; then
+    echo "error: manifest bin must be ticker.bin (src/ota/mod.rs OTA_BIN_NAMES); got '$name'" >&2
+    exit 1
+fi
+"${PYTHON:-python3}" "$(dirname "$0")/check-image-def.py" "$bin" --version "$version"
 
 printf '{"version":"%s","bin":"%s","size":%s,"sha256":"%s"}\n' "$version" "$name" "$size" "$sha256" > "$out"
 cat "$out"
