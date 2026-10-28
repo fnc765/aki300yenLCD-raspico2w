@@ -144,9 +144,10 @@ LCD 走査 (`src/lcd/display.rs`) は PIO0 SM0/SM1 + DMA CH0〜CH3 の **CPU 不
                (embassy_rp::flash::Flash::blocking_erase/write、in_ram + 割り込み禁止)
                受信しながら SHA-256 を計算。size 超過・切断は中断 (対象区画は壊れて
                いてもよい: 起動側は無傷)
-[4] 検証       SHA-256 一致 + 書き戻し読み比較。読み戻しは ATRANS を通さない窓
-               0x1C000000 + オフセット (§2.2 XIP_NOCACHE_NOALLOC_NOTRANSLATE) で行う
-               (0x10000000 窓は自区画しか見えない)
+[4] 検証       SHA-256 一致 → 先頭セクタの IMAGE_DEF 検査 (1.0.1〜: TBYB の RP2350 実行イメージで
+               VERSION が manifest と一致、`src/ota/image.rs`) → 先頭セクタ書き込み → 書き戻し読み比較。
+               読み戻しは ATRANS を通さない窓 0x1C000000 + オフセット
+               (§2.2 XIP_NOCACHE_NOALLOC_NOTRANSLATE) で行う (0x10000000 窓は自区画しか見えない)
 [5] 再起動     reboot(FLASH_UPDATE | NO_RETURN, 100 ms, 0x10000000 + 対象区画オフセット, 0)
 [6] 新版起動   TBYB 付きなので bootrom がウォッチドッグ (16.7 s) 下で起動。buy 待ちの間は
                2 s ごとに WATCHDOG.LOAD を再ロードして延長。自己診断 OK → explicit_buy → 確定。
@@ -186,6 +187,7 @@ LCD 走査 (`src/lcd/display.rs`) は PIO0 SM0/SM1 + DMA CH0〜CH3 の **CPU 不
 |---|---|
 | ダウンロード中に切断・電源断 | 対象区画のみ不完全。起動側は無傷。次回また試す |
 | SHA-256 不一致 | FLASH_UPDATE 再起動しない。対象区画の先頭セクタを消しておく |
+| manifest の `bin` が `ticker.bin` でない / 受信したイメージの IMAGE_DEF が無い・TBYB でない・版数が manifest と違う (1.0.1〜) | ダウンロードしない / 確定しない (先頭セクタを消しておく)。Release には全 bin の `.bin` と `.sha256` が付くので、manifest の書き換えだけで OTA を持たない非 TBYB のイメージ (buy 無しで居座り、OTA 到達保証が効かない) を入れられた (review/fw-security-audit-2026-10-28.md H1)。CI と `make-manifest.sh` も `scripts/check-image-def.py` で同じ検査をする |
 | 新版が起動しない / ハング / パニック | bootrom のウォッチドッグ (16.7 s) で旧版へ。新版は TBYB のまま残り通常起動では選ばれない (延長タスクも止まるので、延長中のハングでも同じ)。v0.2.4 から新版は進行 / panic / HardFault を WATCHDOG.SCRATCH5〜7 に記録し、旧版がそれを LCD に出す ([wifi-ota.md §5.2](wifi-ota.md#52-起動診断-v024-巻き戻りの原因を旧版の画面で読む)) |
 | 新版は起きるが Wi-Fi 等の自己診断 NG | 起動 180 s (0.4.1 まで 120 s) まではウォッチドッグを再ロードして待つ。それでも通らなければ再ロードをやめ、explicit_buy も呼ばない → ウォッチドッグで同上 |
 | 新版は Wi-Fi まで通るが OTA の経路 (TLS) や他の機能で落ちる / 止まる (0.4.0 の事故) | 0.4.2〜の buy 条件は OTA の manifest 確認 (TLS + HTTP) と機能の一巡 + 25 s を含むので buy されず、旧版へ戻る (docs/ticker.md §8.2)。0.4.1 までは Wi-Fi + DHCP だけで buy していたので、buy した後で落ちる版が残り、OTA でも直せなかった |

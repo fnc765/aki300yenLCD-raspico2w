@@ -58,6 +58,12 @@ pub mod web {
 #[cfg(test)]
 mod web_tests;
 
+/// OTA で受け取ったイメージの先頭セクタ (IMAGE_DEF) の検査 (1.0.1〜、純粋)
+#[path = "../../../src/ota/image.rs"]
+pub mod ota_image;
+#[cfg(test)]
+mod image_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;

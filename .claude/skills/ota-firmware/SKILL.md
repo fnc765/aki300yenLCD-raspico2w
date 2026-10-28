@@ -137,6 +137,10 @@ python3 scripts/stack-report.py target/thumbv8m.main-none-eabihf/release/ticker 
    (プロキシ経由のタグ push は 403。`gh pr create` / `gh release download` も GraphQL で 403 なので REST を使う)。
 5. Release の `manifest.json` を確認: `bin` が OTA の bin (`ticker.bin`)、`size` と `sha256` がアセットと一致。
    **稼働中の機体は manifest の `bin` をそのまま取りに行く** (名前を変えると全台がそれに切り替わる)。
+   1.0.1〜 の機体は `bin` が `ota::OTA_BIN_NAMES` (`ticker.bin`) に無い manifest、IMAGE_DEF が TBYB でない /
+   版数が manifest と違うイメージを入れない (`src/ota/image.rs`)。`scripts/check-image-def.py <bin> --version X.Y.Z`
+   が同じ検査 (CI と `make-manifest.sh` も呼ぶ)。manifest の `bin` 名を変える / 新しい bin を配るときは
+   `OTA_BIN_NAMES` に足した版を先に全台へ入れること。
 6. UF2 は `scripts/make-ota-image.sh` が `--abs-block 0x103FFF00` を付ける (RP2350-E10。付けないとテーブルのある機体で D&D が無言で失敗)。
 7. コミットは fnc765 名義: `GIT_AUTHOR_NAME=fnc765 GIT_AUTHOR_EMAIL=84061221+fnc765@users.noreply.github.com`
    (+ `GIT_COMMITTER_*` 同じ) を毎回付ける (コンテナの `GIT_CONFIG_*` が local config を上書きするため)。

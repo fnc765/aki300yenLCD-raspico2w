@@ -200,6 +200,10 @@ jobs:
             cp "target/$TARGET/release/$b" "out/$b.elf"
             scripts/make-ota-image.sh "target/$TARGET/release/$b" out
             picotool info -a -t elf "out/$b.elf" | grep -E 'version|tbyb' || true
+            # 1.0.1〜: the board refuses images whose IMAGE_DEF lacks TBYB or whose version differs
+            # from the manifest (src/ota/image.rs). Fail the build here rather than on the board.
+            python3 scripts/check-image-def.py "out/$b.bin" \
+              --version "$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
           done
           if [ -f out/ticker.bin ]; then
             version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"

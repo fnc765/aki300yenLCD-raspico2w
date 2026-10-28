@@ -34,7 +34,7 @@ use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
 use super::http::{self, BodySink};
 use super::manifest::{Manifest, Version};
 use super::slot::{self, OtaFlash, SectorBuffers, SlotWriter, Slots, slot_label};
-use super::{MANIFEST_NAME, OtaError, URL_MAX, set_latest_asset_url};
+use super::{MANIFEST_NAME, OTA_BIN_NAMES, OtaError, URL_MAX, image, set_latest_asset_url};
 use crate::ab_boot::{self, BootInfo};
 use crate::boot_policy::{BUY_SETTLE_MS, BuyGate, BuyInputs, BuyStep, CheckFailure, CheckOutcome, Round, classify_check};
 use crate::boot_trace::{self, ResetReason, SelftestCounters, Stage, Trace};
@@ -983,9 +983,11 @@ pub fn check_failure(error: OtaError) -> CheckFailure {
         OtaError::Dns | OtaError::Network | OtaError::Tls | OtaError::HttpProtocol | OtaError::Timeout => {
             CheckFailure::Transport
         }
-        OtaError::BadSize
+        OtaError::BinNotAllowed
+        | OtaError::BadSize
         | OtaError::SizeMismatch
         | OtaError::ShaMismatch
+        | OtaError::Image(_)
         | OtaError::ReadbackMismatch
         | OtaError::Flash
         | OtaError::NoPartitionTable
@@ -1056,6 +1058,12 @@ pub async fn run_ota_check(
         return Ok(OtaPhase::Blocked {
             latest: manifest.version,
         });
+    }
+    // 1.0.1〜: OTA の経路を持つ bin だけを取りに行く (Release の他の .bin を manifest で指されても入れない)。
+    // buy 待ち (check_only) でも「新しい版あり」とは言わない
+    if !OTA_BIN_NAMES.contains(&manifest.bin.as_str()) {
+        defmt::warn!("manifest bin {} is not an OTA image; not installing", manifest.bin.as_str());
+        return Err(OtaError::BinNotAllowed);
     }
     if mode.check_only {
         return Ok(OtaPhase::NewerAvailable {
@@ -1129,6 +1137,14 @@ pub async fn run_ota_check(
         version: manifest.version,
     })
     .await;
+    // 1.0.1〜: SHA-256 が合っていても、先頭セクタの IMAGE_DEF が TBYB の RP2350 実行イメージで manifest と
+    // 同じ版数でなければ確定しない (非 TBYB のイメージは buy 無しで居座り、OTA 到達保証が効かなくなる)
+    let v = manifest.version;
+    if let Err(e) = image::check(writer.first_sector(), v.major, v.minor, v.patch) {
+        defmt::error!("image {} rejected: {}", v, e);
+        let _ = writer.invalidate();
+        return Err(OtaError::Image(e));
+    }
     writer.commit_first_sector()?;
     let readback = slot::hash_storage(slots.target.start_offset(), manifest.size);
     if readback != manifest.sha256 {
